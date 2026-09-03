@@ -32,6 +32,8 @@
   th,td{ padding:8px 10px; text-align:left; border-bottom:1px solid var(--border); }
   th{ background:#f2f7fc; color:var(--navy-soft); font-weight:800; font-size:11px; }
   td.num, th.num{ text-align:right; }
+  td.pos{ color:var(--green-dark); font-weight:700; }
+  td.neg{ color:var(--red); font-weight:700; }
 
   .filter-bar{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:16px; }
   .filter-btn{ background:#fff; border:1px solid var(--border); color:var(--navy-soft); font-size:12px; font-weight:700; padding:8px 14px; border-radius:10px; cursor:pointer; }
@@ -42,10 +44,18 @@
   .filter-label{ font-size:11px; color:var(--gray); margin-right:4px; }
 
   .card-title{ font-size:12px; font-weight:800; color:var(--navy-soft); text-align:center; margin-bottom:10px; }
+  .card-title.left{ text-align:left; }
   .chart-legend{ display:flex; justify-content:center; gap:14px; font-size:11px; color:var(--gray); flex-wrap:wrap; margin-top:8px; }
   .chart-legend .dot{ display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:4px; vertical-align:middle; }
   .updated{ text-align:center; font-size:11px; color:var(--gray); margin-top:20px; }
   .period-caption{ text-align:center; font-size:12.5px; color:var(--navy-soft); font-weight:700; margin-bottom:14px; }
+  .section-title{ text-align:center; font-size:16px; font-weight:800; color:#fff; background:linear-gradient(90deg,var(--navy),var(--blue)); padding:10px 18px; border-radius:12px; margin:26px 0 14px; }
+  .lag-list{ display:flex; flex-direction:column; gap:10px; }
+  .lag-row{ display:flex; align-items:center; justify-content:space-between; padding:10px 14px; border-radius:10px; background:#f7fafd; }
+  .lag-row .name{ font-weight:700; font-size:13px; color:var(--navy); }
+  .lag-row .amount{ font-weight:800; font-size:14px; }
+  .lag-row.behind .amount{ color:var(--red); }
+  .lag-row.ahead .amount{ color:var(--green-dark); }
 </style>
 </head>
 <body>
@@ -72,6 +82,7 @@
 
   <div class="period-caption" id="period-caption"></div>
 
+  <!-- 1. ПРИХОД: ПЛАН/ФАКТ -->
   <div class="row" id="cards-row"></div>
 
   <div class="card" style="margin-bottom:16px;">
@@ -80,19 +91,57 @@
     <div class="chart-legend" id="chart-legend"></div>
   </div>
 
+  <!-- 2. ОТСТАВАНИЕ ОТ ПЛАНА -->
+  <div class="section-title">ОТСТАВАНИЕ / ОПЕРЕЖЕНИЕ ПЛАНА, ТГ</div>
+  <div class="card" style="margin-bottom:16px;">
+    <div class="lag-list" id="lag-list"></div>
+  </div>
+
+  <!-- 3. ЛИДЫ: ТАРГЕТ/ОРГАНИКА, БЮДЖЕТ, CPL -->
+  <div class="section-title">ЛИДЫ, БЮДЖЕТ И ЦЕНА ЗАЯВКИ (CPL)</div>
   <div class="card" style="margin-bottom:16px;">
     <table>
       <thead>
-        <tr><th>Проект</th><th class="num">Заявки</th><th class="num">Записей ПУ</th><th class="num">Дошли</th><th class="num">Продаж</th><th class="num">Приход</th><th class="num">% плана периода</th></tr>
+        <tr>
+          <th rowspan="2">Проект</th>
+          <th class="num" colspan="2">Лиды таргет</th>
+          <th class="num" colspan="2">Лиды органика</th>
+          <th class="num" colspan="2">Бюджет, тг</th>
+          <th class="num" colspan="2">CPL, тг</th>
+        </tr>
+        <tr>
+          <th class="num">План</th><th class="num">Факт</th>
+          <th class="num">План</th><th class="num">Факт</th>
+          <th class="num">План</th><th class="num">Факт</th>
+          <th class="num">План</th><th class="num">Факт</th>
+        </tr>
       </thead>
-      <tbody id="table-body"></tbody>
+      <tbody id="leads-table-body"></tbody>
+    </table>
+  </div>
+
+  <!-- 4. ПРОБНЫЕ УРОКИ: ПЛАН/ФАКТ -->
+  <div class="section-title">ПРОБНЫЕ УРОКИ (ПУ): ПЛАН / ФАКТ</div>
+  <div class="card" style="margin-bottom:16px;">
+    <table>
+      <tr><th>Проект</th><th class="num">План записей</th><th class="num">Факт записей</th><th class="num">% плана</th><th class="num">Дошли</th><th class="num">Доходимость</th></tr>
+      <tbody id="pu-table-body"></tbody>
+    </table>
+  </div>
+
+  <!-- 5. ПРОДАЖИ: ПЛАН/ФАКТ -->
+  <div class="section-title">ПРОДАЖИ: ПЛАН / ФАКТ</div>
+  <div class="card" style="margin-bottom:16px;">
+    <table>
+      <tr><th>Проект</th><th class="num">План, шт</th><th class="num">Факт, шт</th><th class="num">% плана (шт)</th><th class="num">План, тг</th><th class="num">Факт, тг</th><th class="num">% плана (тг)</th></tr>
+      <tbody id="sales-table-body"></tbody>
     </table>
   </div>
 
   <p class="updated">Данные пересобираются автоматически при внесении новых записей. Фильтр периода и график работают прямо в браузере.</p>
 </div>
 
-<script id="dashboard-data" type="application/json">{"daily": [{"date": "2026-09-01", "project": "Варламова", "channel": "оффлайн", "leads": 76.0, "pu_records": 30.0, "pu_attended": 17.0, "sales_count": 4.0, "revenue": 1120000.0, "doplaty": 0.0}, {"date": "2026-09-01", "project": "Самал", "channel": "оффлайн", "leads": 44.0, "pu_records": 17.0, "pu_attended": 10.0, "sales_count": 2.0, "revenue": 560000.0, "doplaty": 0.0}, {"date": "2026-09-01", "project": "Астана", "channel": "оффлайн", "leads": 22.0, "pu_records": 9.0, "pu_attended": 5.0, "sales_count": 1.0, "revenue": 280000.0, "doplaty": 0.0}, {"date": "2026-09-01", "project": "Онлайн", "channel": "онлайн", "leads": 64.0, "pu_records": 26.0, "pu_attended": 14.0, "sales_count": 2.0, "revenue": 420000.0, "doplaty": 0.0}, {"date": "2026-09-02", "project": "Варламова", "channel": "оффлайн", "leads": 80.0, "pu_records": 32.0, "pu_attended": 18.0, "sales_count": 4.0, "revenue": 1120000.0, "doplaty": 50000.0}, {"date": "2026-09-02", "project": "Самал", "channel": "оффлайн", "leads": 40.0, "pu_records": 16.0, "pu_attended": 9.0, "sales_count": 2.0, "revenue": 560000.0, "doplaty": 0.0}, {"date": "2026-09-02", "project": "Астана", "channel": "оффлайн", "leads": 20.0, "pu_records": 8.0, "pu_attended": 4.0, "sales_count": 1.0, "revenue": 280000.0, "doplaty": 0.0}, {"date": "2026-09-02", "project": "Онлайн", "channel": "онлайн", "leads": 70.0, "pu_records": 28.0, "pu_attended": 15.0, "sales_count": 3.0, "revenue": 630000.0, "doplaty": 0.0}, {"date": "2026-09-03", "project": "Варламова", "channel": "оффлайн", "leads": 60.0, "pu_records": 24.0, "pu_attended": 13.0, "sales_count": 3.0, "revenue": 840000.0, "doplaty": 0.0}, {"date": "2026-09-03", "project": "Самал", "channel": "оффлайн", "leads": 35.0, "pu_records": 14.0, "pu_attended": 8.0, "sales_count": 1.0, "revenue": 280000.0, "doplaty": 20000.0}, {"date": "2026-09-03", "project": "Астана", "channel": "оффлайн", "leads": 18.0, "pu_records": 7.0, "pu_attended": 4.0, "sales_count": 0.0, "revenue": 0.0, "doplaty": 0.0}, {"date": "2026-09-03", "project": "Онлайн", "channel": "онлайн", "leads": 55.0, "pu_records": 22.0, "pu_attended": 12.0, "sales_count": 2.0, "revenue": 420000.0, "doplaty": 0.0}], "plans": {"2026-09": {"Варламова": 35000000.0, "Самал": 20000000.0, "Астана": 10000000.0, "Онлайн": 15000000.0}}, "projects": ["Варламова", "Самал", "Астана", "Онлайн"], "generatedAt": "03.09.2026 07:55"}</script>
+<script id="dashboard-data" type="application/json">{"daily": [{"date": "2026-09-01", "project": "Варламова", "channel": "оффлайн", "leads_target": 60.0, "leads_organic": 16.0, "budget_spent": 21500.0, "pu_records": 30.0, "pu_attended": 17.0, "sales_count": 4.0, "revenue": 1120000.0, "doplaty": 0.0}, {"date": "2026-09-01", "project": "Самал", "channel": "оффлайн", "leads_target": 34.0, "leads_organic": 9.0, "budget_spent": 12500.0, "pu_records": 17.0, "pu_attended": 10.0, "sales_count": 2.0, "revenue": 560000.0, "doplaty": 0.0}, {"date": "2026-09-01", "project": "Астана", "channel": "оффлайн", "leads_target": 17.0, "leads_organic": 4.0, "budget_spent": 6500.0, "pu_records": 9.0, "pu_attended": 5.0, "sales_count": 1.0, "revenue": 280000.0, "doplaty": 0.0}, {"date": "2026-09-01", "project": "Онлайн", "channel": "онлайн", "leads_target": 51.0, "leads_organic": 12.0, "budget_spent": 10000.0, "pu_records": 26.0, "pu_attended": 14.0, "sales_count": 2.0, "revenue": 420000.0, "doplaty": 0.0}, {"date": "2026-09-02", "project": "Варламова", "channel": "оффлайн", "leads_target": 63.0, "leads_organic": 17.0, "budget_spent": 21800.0, "pu_records": 32.0, "pu_attended": 18.0, "sales_count": 4.0, "revenue": 1120000.0, "doplaty": 50000.0}, {"date": "2026-09-02", "project": "Самал", "channel": "оффлайн", "leads_target": 32.0, "leads_organic": 8.0, "budget_spent": 12600.0, "pu_records": 16.0, "pu_attended": 9.0, "sales_count": 2.0, "revenue": 560000.0, "doplaty": 0.0}, {"date": "2026-09-02", "project": "Астана", "channel": "оффлайн", "leads_target": 16.0, "leads_organic": 4.0, "budget_spent": 6600.0, "pu_records": 8.0, "pu_attended": 4.0, "sales_count": 1.0, "revenue": 280000.0, "doplaty": 0.0}, {"date": "2026-09-02", "project": "Онлайн", "channel": "онлайн", "leads_target": 55.0, "leads_organic": 13.0, "budget_spent": 10200.0, "pu_records": 28.0, "pu_attended": 15.0, "sales_count": 3.0, "revenue": 630000.0, "doplaty": 0.0}, {"date": "2026-09-03", "project": "Варламова", "channel": "оффлайн", "leads_target": 47.0, "leads_organic": 13.0, "budget_spent": 21600.0, "pu_records": 24.0, "pu_attended": 13.0, "sales_count": 3.0, "revenue": 840000.0, "doplaty": 0.0}, {"date": "2026-09-03", "project": "Самал", "channel": "оффлайн", "leads_target": 28.0, "leads_organic": 7.0, "budget_spent": 12400.0, "pu_records": 14.0, "pu_attended": 8.0, "sales_count": 1.0, "revenue": 280000.0, "doplaty": 20000.0}, {"date": "2026-09-03", "project": "Астана", "channel": "оффлайн", "leads_target": 14.0, "leads_organic": 4.0, "budget_spent": 6400.0, "pu_records": 7.0, "pu_attended": 4.0, "sales_count": 0.0, "revenue": 0.0, "doplaty": 0.0}, {"date": "2026-09-03", "project": "Онлайн", "channel": "онлайн", "leads_target": 43.0, "leads_organic": 10.0, "budget_spent": 9900.0, "pu_records": 22.0, "pu_attended": 12.0, "sales_count": 2.0, "revenue": 420000.0, "doplaty": 0.0}], "plans": {"2026-09": {"Варламова": {"revenue": 35000000.0, "leads_target": 1800.0, "leads_organic": 475.0, "budget": 650000.0, "pu_records": 910.0, "sales_count": 125.0}, "Самал": {"revenue": 20000000.0, "leads_target": 1030.0, "leads_organic": 280.0, "budget": 380000.0, "pu_records": 524.0, "sales_count": 72.0}, "Астана": {"revenue": 10000000.0, "leads_target": 520.0, "leads_organic": 135.0, "budget": 200000.0, "pu_records": 262.0, "sales_count": 36.0}, "Онлайн": {"revenue": 15000000.0, "leads_target": 1550.0, "leads_organic": 378.0, "budget": 300000.0, "pu_records": 771.0, "sales_count": 72.0}}}, "projects": ["Варламова", "Самал", "Астана", "Онлайн"], "generatedAt": "03.09.2026 08:13"}</script>
 <script>
 const DATA = JSON.parse(document.getElementById('dashboard-data').textContent);
 const PROJECT_COLORS = ['#2f6fb0', '#3aa0a0', '#e0a63a', '#6fbf5e', '#8a4fe0', '#e2574c'];
@@ -106,52 +155,46 @@ function toISO(d){ return d.toISOString().slice(0,10); }
 function daysInMonth(y, mIdx){ return new Date(y, mIdx+1, 0).getDate(); }
 function monthKey(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); }
 
-function proratedPlanForDate(d, project){
+function proratedPlan(d, project, metric){
   const mk = monthKey(d);
-  const monthPlans = DATA.plans[mk];
-  if (!monthPlans || !(project in monthPlans)) return 0;
-  return monthPlans[project] / daysInMonth(d.getFullYear(), d.getMonth());
+  const mp = DATA.plans[mk];
+  if (!mp || !mp[project]) return 0;
+  return (mp[project][metric] || 0) / daysInMonth(d.getFullYear(), d.getMonth());
 }
 
 function eachDate(start, end){
-  const out = [];
-  let cur = new Date(start);
-  while (cur <= end){
-    out.push(new Date(cur));
-    cur.setDate(cur.getDate()+1);
-  }
+  const out = []; let cur = new Date(start);
+  while (cur <= end){ out.push(new Date(cur)); cur.setDate(cur.getDate()+1); }
   return out;
 }
 
 function renderRange(start, end, label){
   document.getElementById('period-caption').textContent =
     label + ' (' + toISO(start) + ' — ' + toISO(end) + ')';
-
   const startISO = toISO(start), endISO = toISO(end);
   const filtered = DATA.daily.filter(r => r.date >= startISO && r.date <= endISO);
-
-  const agg = {};
-  DATA.projects.forEach(p => agg[p] = {leads:0,pu_records:0,pu_attended:0,sales_count:0,revenue:0});
-  filtered.forEach(r => {
-    if (!agg[r.project]) agg[r.project] = {leads:0,pu_records:0,pu_attended:0,sales_count:0,revenue:0};
-    agg[r.project].leads += r.leads;
-    agg[r.project].pu_records += r.pu_records;
-    agg[r.project].pu_attended += r.pu_attended;
-    agg[r.project].sales_count += r.sales_count;
-    agg[r.project].revenue += r.revenue + r.doplaty;
-  });
-
   const dateList = eachDate(start, end);
-  const planByProject = {};
-  DATA.projects.forEach(p => planByProject[p] = 0);
-  dateList.forEach(d => {
-    DATA.projects.forEach(p => { planByProject[p] += proratedPlanForDate(d, p); });
+
+  const empty = () => ({leads_target:0, leads_organic:0, budget_spent:0, pu_records:0, pu_attended:0, sales_count:0, revenue:0});
+  const agg = {}; DATA.projects.forEach(p => agg[p] = empty());
+  filtered.forEach(r => {
+    if (!agg[r.project]) agg[r.project] = empty();
+    const a = agg[r.project];
+    a.leads_target += r.leads_target; a.leads_organic += r.leads_organic;
+    a.budget_spent += r.budget_spent; a.pu_records += r.pu_records;
+    a.pu_attended += r.pu_attended; a.sales_count += r.sales_count;
+    a.revenue += r.revenue + r.doplaty;
   });
+
+  const metrics = ['revenue','leads_target','leads_organic','budget','pu_records','sales_count'];
+  const plan = {}; DATA.projects.forEach(p => { plan[p] = {}; metrics.forEach(m => plan[p][m]=0); });
+  dateList.forEach(d => DATA.projects.forEach(p => metrics.forEach(m => { plan[p][m] += proratedPlan(d,p,m); })));
 
   const totalFact = DATA.projects.reduce((s,p)=>s+agg[p].revenue,0);
-  const totalPlan = DATA.projects.reduce((s,p)=>s+planByProject[p],0);
+  const totalPlan = DATA.projects.reduce((s,p)=>s+plan[p].revenue,0);
   const totalPct = totalPlan ? (totalFact/totalPlan*100) : 0;
 
+  // ---- 1. Карточки приход ----
   let cardsHtml = `
     <div class="card metric">
       <div class="label">ОБЩИЙ ПРИХОД</div>
@@ -163,15 +206,14 @@ function renderRange(start, end, label){
       <div class="ring-caption">% от плана периода</div>
     </div>`;
   DATA.projects.forEach((p, idx) => {
-    const plan = planByProject[p];
-    const fact = agg[p].revenue;
-    const pct = plan ? (fact/plan*100) : 0;
+    const pl = plan[p].revenue, fa = agg[p].revenue;
+    const pct = pl ? (fa/pl*100) : 0;
     const color = colorFor(idx);
     cardsHtml += `
     <div class="card metric">
       <div class="label">${p.toUpperCase()}</div>
-      <div class="big">${fmtTg(fact)}</div>
-      <div class="sub">План периода: ${fmtTg(plan)}</div>
+      <div class="big">${fmtTg(fa)}</div>
+      <div class="sub">План периода: ${fmtTg(pl)}</div>
       <div class="ring" style="background:conic-gradient(${color} 0% ${Math.min(pct,100).toFixed(1)}%, var(--blue-track) ${Math.min(pct,100).toFixed(1)}% 100%);">
         <div class="ring-inner"><div class="pct" style="color:${color}">${pct.toFixed(1)}%</div></div>
       </div>
@@ -180,24 +222,68 @@ function renderRange(start, end, label){
   });
   document.getElementById('cards-row').innerHTML = cardsHtml;
 
-  let rowsHtml = '';
+  renderChart(dateList, filtered);
+
+  // ---- 2. Отставание/опережение в тг ----
+  let lagHtml = '';
+  const totalDiff = totalFact - totalPlan;
+  lagHtml += `<div class="lag-row ${totalDiff<0?'behind':'ahead'}"><span class="name">ИТОГО ПО КОМПАНИИ</span><span class="amount">${totalDiff<0?'−':'+'}${fmtTg(Math.abs(totalDiff))}</span></div>`;
   DATA.projects.forEach(p => {
-    const a = agg[p];
-    const plan = planByProject[p];
-    const pct = plan ? (a.revenue/plan*100) : 0;
-    rowsHtml += `<tr>
+    const diff = agg[p].revenue - plan[p].revenue;
+    lagHtml += `<div class="lag-row ${diff<0?'behind':'ahead'}"><span class="name">${p}</span><span class="amount">${diff<0?'−':'+'}${fmtTg(Math.abs(diff))}</span></div>`;
+  });
+  document.getElementById('lag-list').innerHTML = lagHtml;
+
+  // ---- 3. Лиды / бюджет / CPL ----
+  let leadsRows = '';
+  DATA.projects.forEach(p => {
+    const a = agg[p], pl = plan[p];
+    const cplPlan = pl.leads_target ? (pl.budget/pl.leads_target) : 0;
+    const cplFact = a.leads_target ? (a.budget_spent/a.leads_target) : 0;
+    leadsRows += `<tr>
       <td>${p}</td>
-      <td class="num">${fmtInt(a.leads)}</td>
-      <td class="num">${fmtInt(a.pu_records)}</td>
-      <td class="num">${fmtInt(a.pu_attended)}</td>
-      <td class="num">${fmtInt(a.sales_count)}</td>
-      <td class="num">${fmtTg(a.revenue)}</td>
-      <td class="num">${pct.toFixed(1)}%</td>
+      <td class="num">${fmtInt(pl.leads_target)}</td><td class="num">${fmtInt(a.leads_target)}</td>
+      <td class="num">${fmtInt(pl.leads_organic)}</td><td class="num">${fmtInt(a.leads_organic)}</td>
+      <td class="num">${fmtTg(pl.budget)}</td><td class="num">${fmtTg(a.budget_spent)}</td>
+      <td class="num">${fmtTg(cplPlan)}</td><td class="num ${cplFact>cplPlan?'neg':'pos'}">${fmtTg(cplFact)}</td>
     </tr>`;
   });
-  document.getElementById('table-body').innerHTML = rowsHtml;
+  document.getElementById('leads-table-body').innerHTML = leadsRows;
 
-  renderChart(dateList, filtered);
+  // ---- 4. ПУ ----
+  let puRows = '';
+  DATA.projects.forEach(p => {
+    const a = agg[p], pl = plan[p];
+    const pct = pl.pu_records ? (a.pu_records/pl.pu_records*100) : 0;
+    const doh = a.pu_records ? (a.pu_attended/a.pu_records*100) : 0;
+    puRows += `<tr>
+      <td>${p}</td>
+      <td class="num">${fmtInt(pl.pu_records)}</td>
+      <td class="num">${fmtInt(a.pu_records)}</td>
+      <td class="num ${pct>=100?'pos':'neg'}">${pct.toFixed(1)}%</td>
+      <td class="num">${fmtInt(a.pu_attended)}</td>
+      <td class="num">${doh.toFixed(1)}%</td>
+    </tr>`;
+  });
+  document.getElementById('pu-table-body').innerHTML = puRows;
+
+  // ---- 5. Продажи ----
+  let salesRows = '';
+  DATA.projects.forEach(p => {
+    const a = agg[p], pl = plan[p];
+    const pctCnt = pl.sales_count ? (a.sales_count/pl.sales_count*100) : 0;
+    const pctRev = pl.revenue ? (a.revenue/pl.revenue*100) : 0;
+    salesRows += `<tr>
+      <td>${p}</td>
+      <td class="num">${fmtInt(pl.sales_count)}</td>
+      <td class="num">${fmtInt(a.sales_count)}</td>
+      <td class="num ${pctCnt>=100?'pos':'neg'}">${pctCnt.toFixed(1)}%</td>
+      <td class="num">${fmtTg(pl.revenue)}</td>
+      <td class="num">${fmtTg(a.revenue)}</td>
+      <td class="num ${pctRev>=100?'pos':'neg'}">${pctRev.toFixed(1)}%</td>
+    </tr>`;
+  });
+  document.getElementById('sales-table-body').innerHTML = salesRows;
 }
 
 function renderChart(dateList, filtered){
@@ -207,56 +293,45 @@ function renderChart(dateList, filtered){
     if (!byDateProject[r.date]) byDateProject[r.date] = {};
     byDateProject[r.date][r.project] = (byDateProject[r.date][r.project]||0) + r.revenue + r.doplaty;
   });
-
   const n = dateList.length;
-  const w = Math.max(600, n*46);
-  const h = 220;
-  const padL = 60, padR = 10, padT = 10, padB = 34;
-  const plotW = w - padL - padR;
-  const plotH = h - padT - padB;
-
-  let maxDayTotal = 0;
+  const w = Math.max(600, n*46), h = 220;
+  const padL=60,padR=10,padT=10,padB=34;
+  const plotW=w-padL-padR, plotH=h-padT-padB;
+  let maxDayTotal=0;
   dateList.forEach(d => {
-    const iso = toISO(d);
-    const dayTotal = DATA.projects.reduce((s,p)=> s + (byDateProject[iso][p]||0), 0);
-    if (dayTotal > maxDayTotal) maxDayTotal = dayTotal;
+    const iso=toISO(d);
+    const dayTotal = DATA.projects.reduce((s,p)=> s+(byDateProject[iso][p]||0),0);
+    if (dayTotal>maxDayTotal) maxDayTotal=dayTotal;
   });
-  if (maxDayTotal === 0) maxDayTotal = 1;
-  const niceMax = maxDayTotal * 1.15;
-
+  if (maxDayTotal===0) maxDayTotal=1;
+  const niceMax = maxDayTotal*1.15;
   const barW = Math.min(34, plotW/n*0.6);
   const step = plotW/n;
-
   let svg = `<svg viewBox="0 0 ${w} ${h}" style="width:100%; height:auto; display:block;">`;
   for (let i=0;i<=4;i++){
-    const y = padT + plotH - (plotH*i/4);
+    const y = padT+plotH-(plotH*i/4);
     const val = niceMax*i/4;
     svg += `<line x1="${padL}" y1="${y}" x2="${w-padR}" y2="${y}" stroke="#e3edf7" stroke-width="1"/>`;
     svg += `<text x="${padL-8}" y="${y+4}" text-anchor="end" font-size="10" fill="#6b7a90">${Math.round(val/1000)}k</text>`;
   }
-
-  dateList.forEach((d, i) => {
-    const iso = toISO(d);
-    let yCursor = padT + plotH;
-    const x = padL + i*step + (step-barW)/2;
-    DATA.projects.forEach((p, pi) => {
-      const val = byDateProject[iso][p] || 0;
-      if (val <= 0) return;
+  dateList.forEach((d,i) => {
+    const iso=toISO(d);
+    let yCursor = padT+plotH;
+    const x = padL+i*step+(step-barW)/2;
+    DATA.projects.forEach((p,pi) => {
+      const val = byDateProject[iso][p]||0;
+      if (val<=0) return;
       const barH = (val/niceMax)*plotH;
       yCursor -= barH;
       svg += `<rect x="${x.toFixed(1)}" y="${yCursor.toFixed(1)}" width="${barW.toFixed(1)}" height="${barH.toFixed(1)}" fill="${colorFor(pi)}" rx="2"/>`;
     });
-    const label = d.getDate() + '.' + String(d.getMonth()+1).padStart(2,'0');
+    const label = d.getDate()+'.'+String(d.getMonth()+1).padStart(2,'0');
     svg += `<text x="${(x+barW/2).toFixed(1)}" y="${h-padB+16}" text-anchor="middle" font-size="10" fill="#6b7a90">${label}</text>`;
   });
-
   svg += `</svg>`;
   document.getElementById('chart-wrap').innerHTML = svg;
-
   let legend = '';
-  DATA.projects.forEach((p, idx) => {
-    legend += `<span><span class="dot" style="background:${colorFor(idx)}"></span>${p}</span>`;
-  });
+  DATA.projects.forEach((p,idx) => { legend += `<span><span class="dot" style="background:${colorFor(idx)}"></span>${p}</span>`; });
   document.getElementById('chart-legend').innerHTML = legend;
 }
 
@@ -266,45 +341,23 @@ function setActiveButton(btn){
 }
 
 function applyPreset(preset, btn){
-  const today = new Date();
-  today.setHours(0,0,0,0);
+  const today = new Date(); today.setHours(0,0,0,0);
   let start, end, label;
-
-  if (preset === 'today'){
-    start = new Date(today); end = new Date(today); label = 'Сегодня';
-  } else if (preset === 'yesterday'){
-    start = new Date(today); start.setDate(start.getDate()-1);
-    end = new Date(start); label = 'Вчера';
-  } else if (preset === 'last7'){
-    end = new Date(today);
-    start = new Date(today); start.setDate(start.getDate()-6);
-    label = 'Последние 7 дней';
-  } else if (preset === 'thisweek'){
-    const dow = (today.getDay()+6)%7;
-    start = new Date(today); start.setDate(start.getDate()-dow);
-    end = new Date(today);
-    label = 'Эта неделя';
-  } else if (preset === 'thismonth'){
-    start = new Date(today.getFullYear(), today.getMonth(), 1);
-    end = new Date(today);
-    label = 'Этот месяц';
-  } else if (preset === 'lastmonth'){
-    start = new Date(today.getFullYear(), today.getMonth()-1, 1);
-    end = new Date(today.getFullYear(), today.getMonth(), 0);
-    label = 'Прошлый месяц';
-  }
+  if (preset==='today'){ start=new Date(today); end=new Date(today); label='Сегодня'; }
+  else if (preset==='yesterday'){ start=new Date(today); start.setDate(start.getDate()-1); end=new Date(start); label='Вчера'; }
+  else if (preset==='last7'){ end=new Date(today); start=new Date(today); start.setDate(start.getDate()-6); label='Последние 7 дней'; }
+  else if (preset==='thisweek'){ const dow=(today.getDay()+6)%7; start=new Date(today); start.setDate(start.getDate()-dow); end=new Date(today); label='Эта неделя'; }
+  else if (preset==='thismonth'){ start=new Date(today.getFullYear(), today.getMonth(), 1); end=new Date(today); label='Этот месяц'; }
+  else if (preset==='lastmonth'){ start=new Date(today.getFullYear(), today.getMonth()-1, 1); end=new Date(today.getFullYear(), today.getMonth(), 0); label='Прошлый месяц'; }
   setActiveButton(btn);
   document.getElementById('date-from').value = toISO(start);
   document.getElementById('date-to').value = toISO(end);
   renderRange(start, end, label);
 }
 
-document.querySelectorAll('.filter-btn').forEach(btn => {
-  btn.addEventListener('click', () => applyPreset(btn.dataset.preset, btn));
-});
+document.querySelectorAll('.filter-btn').forEach(btn => btn.addEventListener('click', () => applyPreset(btn.dataset.preset, btn)));
 document.getElementById('apply-custom').addEventListener('click', () => {
-  const from = document.getElementById('date-from').value;
-  const to = document.getElementById('date-to').value;
+  const from = document.getElementById('date-from').value, to = document.getElementById('date-to').value;
   if (!from || !to) return;
   setActiveButton(null);
   renderRange(new Date(from), new Date(to), 'Свой период');
