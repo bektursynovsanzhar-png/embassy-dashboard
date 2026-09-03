@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
 Собирает интерактивный HTML-дашборд Embassy.
-Данные встраиваются в страницу как JSON — фильтр периода и график
+Все данные встраиваются в страницу как JSON — фильтры, графики и расчёты
 работают в браузере без пересборки. Пересборка нужна только когда
-в data/daily.csv или data/plans.csv появляются новые строки.
+в data/*.csv появляются новые строки.
 """
 import csv
 import json
@@ -13,10 +13,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 DATA_DAILY = ROOT / "data" / "daily.csv"
 DATA_PLANS = ROOT / "data" / "plans.csv"
+DATA_SMM = ROOT / "data" / "smm.csv"
 OUTPUT = ROOT / "index.html"
 
 
 def read_csv(path):
+    if not path.exists():
+        return []
     with open(path, encoding="utf-8") as f:
         return list(csv.DictReader(f))
 
@@ -31,6 +34,7 @@ def num(v, default=0):
 def build():
     daily_rows = read_csv(DATA_DAILY)
     plan_rows = read_csv(DATA_PLANS)
+    smm_rows = read_csv(DATA_SMM)
     if not daily_rows:
         raise SystemExit("Нет данных в daily.csv")
 
@@ -47,10 +51,16 @@ def build():
             "leads_target": num(row.get("leads_target")),
             "leads_organic": num(row.get("leads_organic")),
             "budget_spent": num(row.get("budget_spent")),
+            "reject_offhours": num(row.get("reject_offhours")),
+            "reject_no_number": num(row.get("reject_no_number")),
+            "reject_no_answer": num(row.get("reject_no_answer")),
+            "reject_nontarget": num(row.get("reject_nontarget")),
             "pu_records": num(row.get("pu_records")),
             "pu_attended": num(row.get("pu_attended")),
-            "sales_count": num(row.get("sales_count")),
-            "revenue": num(row.get("revenue")),
+            "sales_target": num(row.get("sales_target")),
+            "sales_organic": num(row.get("sales_organic")),
+            "revenue_target": num(row.get("revenue_target")),
+            "revenue_organic": num(row.get("revenue_organic")),
             "doplaty": num(row.get("doplaty")),
         })
 
@@ -68,17 +78,26 @@ def build():
             "sales_count": num(row.get("plan_sales_count")),
         }
 
+    smm = [{
+        "date": row["date"],
+        "views": num(row.get("views")),
+        "new_followers": num(row.get("new_followers")),
+        "reach": num(row.get("reach")),
+        "engagement": num(row.get("engagement")),
+    } for row in smm_rows]
+
     now = datetime.datetime.now()
     payload = {
         "daily": daily,
         "plans": plans,
+        "smm": smm,
         "projects": projects_order,
         "generatedAt": now.strftime("%d.%m.%Y %H:%M"),
     }
     data_json = json.dumps(payload, ensure_ascii=False)
     html = HTML_TEMPLATE.replace("__DATA_JSON__", data_json)
     OUTPUT.write_text(html, encoding="utf-8")
-    print(f"Собрано: {OUTPUT} (записей: {len(daily)}, проектов: {len(projects_order)})")
+    print(f"Собрано: {OUTPUT} (записей: {len(daily)}, проектов: {len(projects_order)}, SMM: {len(smm)})")
 
 
 HTML_TEMPLATE = """<!DOCTYPE html>
@@ -102,7 +121,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   header.title h1{ font-size:28px; font-weight:800; margin:0 0 6px; color:var(--navy); }
   header.title p{ margin:0; color:var(--gray); font-size:13px; }
   .card{ background:var(--card); border:1px solid var(--border); border-radius:16px; box-shadow:0 2px 10px rgba(23,57,99,0.05); padding:18px 20px; }
+  .card.alert{ border:2px solid var(--red); background:#fff8f7; }
   .row{ display:grid; gap:16px; margin-bottom:16px; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); }
+  .row-2{ grid-template-columns: repeat(auto-fit, minmax(340px,1fr)); }
   .metric{ text-align:center; display:flex; flex-direction:column; align-items:center; gap:6px; }
   .metric .label{ font-size:11.5px; font-weight:800; color:var(--navy-soft); }
   .metric .big{ font-size:19px; font-weight:800; color:var(--navy); }
@@ -127,18 +148,26 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .filter-label{ font-size:11px; color:var(--gray); margin-right:4px; }
 
   .card-title{ font-size:12px; font-weight:800; color:var(--navy-soft); text-align:center; margin-bottom:10px; }
-  .card-title.left{ text-align:left; }
   .chart-legend{ display:flex; justify-content:center; gap:14px; font-size:11px; color:var(--gray); flex-wrap:wrap; margin-top:8px; }
   .chart-legend .dot{ display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:4px; vertical-align:middle; }
   .updated{ text-align:center; font-size:11px; color:var(--gray); margin-top:20px; }
   .period-caption{ text-align:center; font-size:12.5px; color:var(--navy-soft); font-weight:700; margin-bottom:14px; }
   .section-title{ text-align:center; font-size:16px; font-weight:800; color:#fff; background:linear-gradient(90deg,var(--navy),var(--blue)); padding:10px 18px; border-radius:12px; margin:26px 0 14px; }
-  .lag-list{ display:flex; flex-direction:column; gap:10px; }
-  .lag-row{ display:flex; align-items:center; justify-content:space-between; padding:10px 14px; border-radius:10px; background:#f7fafd; }
-  .lag-row .name{ font-weight:700; font-size:13px; color:var(--navy); }
-  .lag-row .amount{ font-weight:800; font-size:14px; }
-  .lag-row.behind .amount{ color:var(--red); }
-  .lag-row.ahead .amount{ color:var(--green-dark); }
+  .section-hint{ text-align:center; font-size:11px; color:var(--gray); margin:-10px 0 14px; }
+
+  .card-lag{ font-size:11.5px; font-weight:800; margin-top:2px; padding:3px 10px; border-radius:8px; }
+  .card-lag.behind{ color:var(--red); background:#fbe2df; }
+  .card-lag.ahead{ color:var(--green-dark); background:var(--green-track); }
+  .card-delta{ font-size:10.5px; font-weight:700; margin-top:2px; }
+  .card-delta.up{ color:var(--green-dark); }
+  .card-delta.down{ color:var(--red); }
+
+  .funnel{ display:flex; flex-direction:column; gap:10px; }
+  .funnel-row{ display:flex; align-items:center; gap:10px; }
+  .funnel-row .flabel{ width:130px; font-size:11.5px; font-weight:700; color:var(--navy-soft); flex-shrink:0; }
+  .funnel-track{ flex:1; background:var(--blue-track); border-radius:7px; height:24px; position:relative; overflow:hidden; }
+  .funnel-fill{ height:100%; border-radius:7px; display:flex; align-items:center; justify-content:flex-end; padding-right:8px; color:#fff; font-size:11px; font-weight:800; }
+  .funnel-conv{ width:70px; text-align:right; font-size:11px; color:var(--gray); font-weight:700; }
 </style>
 </head>
 <body>
@@ -165,8 +194,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
   <div class="period-caption" id="period-caption"></div>
 
-  <!-- 1. ПРИХОД: ПЛАН/ФАКТ -->
+  <!-- ПРИХОД: план/факт/отставание/сравнение с прошлым периодом -->
   <div class="row" id="cards-row"></div>
+
+  <!-- ПРОГНОЗ НА КОНЕЦ МЕСЯЦА (не зависит от фильтра) -->
+  <div class="section-title">ПРОГНОЗ НА КОНЕЦ МЕСЯЦА</div>
+  <div class="section-hint" id="forecast-hint"></div>
+  <div class="row" id="forecast-row"></div>
 
   <div class="card" style="margin-bottom:16px;">
     <div class="card-title">ДИНАМИКА ПРИХОДА ПО ДНЯМ</div>
@@ -174,13 +208,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     <div class="chart-legend" id="chart-legend"></div>
   </div>
 
-  <!-- 2. ОТСТАВАНИЕ ОТ ПЛАНА -->
-  <div class="section-title">ОТСТАВАНИЕ / ОПЕРЕЖЕНИЕ ПЛАНА, ТГ</div>
+  <!-- ВОРОНКА -->
+  <div class="section-title">ВОРОНКА: ЗАЯВКИ → ПУ → ДОШЛИ → ПРОДАЖИ</div>
   <div class="card" style="margin-bottom:16px;">
-    <div class="lag-list" id="lag-list"></div>
+    <div class="funnel" id="funnel"></div>
   </div>
 
-  <!-- 3. ЛИДЫ: ТАРГЕТ/ОРГАНИКА, БЮДЖЕТ, CPL -->
+  <!-- ЛИДЫ / БЮДЖЕТ / CPL -->
   <div class="section-title">ЛИДЫ, БЮДЖЕТ И ЦЕНА ЗАЯВКИ (CPL)</div>
   <div class="card" style="margin-bottom:16px;">
     <table>
@@ -203,7 +237,43 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     </table>
   </div>
 
-  <!-- 4. ПРОБНЫЕ УРОКИ: ПЛАН/ФАКТ -->
+  <div class="row row-2">
+    <div class="card">
+      <div class="card-title">ДИНАМИКА CPL ПО ДНЯМ</div>
+      <div id="cpl-chart-wrap"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">ДИНАМИКА СРЕДНЕГО ЧЕКА ПО ДНЯМ</div>
+      <div id="check-chart-wrap"></div>
+    </div>
+  </div>
+
+  <!-- ОТКАЗЫ ПО ПРИЧИНАМ -->
+  <div class="section-title">ОТКАЗЫ ЛИДОВ ПО ПРИЧИНАМ</div>
+  <div class="row row-2">
+    <div class="card">
+      <div class="card-title">ПРИЧИНЫ ОТКАЗОВ ЗА ПЕРИОД</div>
+      <table>
+        <tr><th>Причина</th><th class="num">Кол-во</th><th class="num">% от заявок</th></tr>
+        <tbody id="rejects-table-body"></tbody>
+      </table>
+    </div>
+    <div class="card">
+      <div class="card-title">ДОЛЯ ОТКАЗОВ ОТ ЗАЯВОК</div>
+      <div id="rejects-bars"></div>
+    </div>
+  </div>
+
+  <!-- ПРОДАЖИ ПО ИСТОЧНИКАМ -->
+  <div class="section-title">ПРОДАЖИ ПО ИСТОЧНИКАМ: ТАРГЕТ vs ОРГАНИКА</div>
+  <div class="card" style="margin-bottom:16px;">
+    <table>
+      <tr><th>Источник</th><th class="num">Продаж, шт</th><th class="num">Сумма, тг</th><th class="num">Средний чек</th><th class="num">Доля продаж</th></tr>
+      <tbody id="source-table-body"></tbody>
+    </table>
+  </div>
+
+  <!-- ПУ -->
   <div class="section-title">ПРОБНЫЕ УРОКИ (ПУ): ПЛАН / ФАКТ</div>
   <div class="card" style="margin-bottom:16px;">
     <table>
@@ -212,7 +282,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     </table>
   </div>
 
-  <!-- 5. ПРОДАЖИ: ПЛАН/ФАКТ -->
+  <!-- ПРОДАЖИ ПЛАН/ФАКТ -->
   <div class="section-title">ПРОДАЖИ: ПЛАН / ФАКТ</div>
   <div class="card" style="margin-bottom:16px;">
     <table>
@@ -221,7 +291,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     </table>
   </div>
 
-  <p class="updated">Данные пересобираются автоматически при внесении новых записей. Фильтр периода и график работают прямо в браузере.</p>
+  <!-- СММ -->
+  <div class="section-title" id="smm-title" style="display:none;">СММ / INSTAGRAM</div>
+  <div class="row" id="smm-row"></div>
+
+  <p class="updated">Данные пересобираются автоматически при внесении новых записей. Фильтр периода и графики работают прямо в браузере.</p>
 </div>
 
 <script id="dashboard-data" type="application/json">__DATA_JSON__</script>
@@ -229,6 +303,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 const DATA = JSON.parse(document.getElementById('dashboard-data').textContent);
 const PROJECT_COLORS = ['#2f6fb0', '#3aa0a0', '#e0a63a', '#6fbf5e', '#8a4fe0', '#e2574c'];
 function colorFor(idx){ return PROJECT_COLORS[idx % PROJECT_COLORS.length]; }
+const ALERT_THRESHOLD = 50; // % от плана, ниже которого подсвечиваем карточку
 
 document.getElementById('generated-at').textContent = 'Данные обновлены: ' + DATA.generatedAt;
 
@@ -237,6 +312,7 @@ function fmtInt(v){ return Math.round(v).toLocaleString('ru-RU'); }
 function toISO(d){ return d.toISOString().slice(0,10); }
 function daysInMonth(y, mIdx){ return new Date(y, mIdx+1, 0).getDate(); }
 function monthKey(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); }
+function addDays(d, n){ const r = new Date(d); r.setDate(r.getDate()+n); return r; }
 
 function proratedPlan(d, project, metric){
   const mk = monthKey(d);
@@ -251,35 +327,70 @@ function eachDate(start, end){
   return out;
 }
 
+function emptyAgg(){
+  return {leads_target:0, leads_organic:0, budget_spent:0,
+    reject_offhours:0, reject_no_number:0, reject_no_answer:0, reject_nontarget:0,
+    pu_records:0, pu_attended:0,
+    sales_target:0, sales_organic:0, revenue_target:0, revenue_organic:0, doplaty:0};
+}
+
+function aggregate(rows, projects){
+  const agg = {}; projects.forEach(p => agg[p]=emptyAgg());
+  rows.forEach(r => {
+    if (!agg[r.project]) agg[r.project]=emptyAgg();
+    const a = agg[r.project];
+    a.leads_target+=r.leads_target; a.leads_organic+=r.leads_organic; a.budget_spent+=r.budget_spent;
+    a.reject_offhours+=r.reject_offhours; a.reject_no_number+=r.reject_no_number;
+    a.reject_no_answer+=r.reject_no_answer; a.reject_nontarget+=r.reject_nontarget;
+    a.pu_records+=r.pu_records; a.pu_attended+=r.pu_attended;
+    a.sales_target+=r.sales_target; a.sales_organic+=r.sales_organic;
+    a.revenue_target+=r.revenue_target; a.revenue_organic+=r.revenue_organic; a.doplaty+=r.doplaty;
+  });
+  return agg;
+}
+function aggRevenue(a){ return a.revenue_target + a.revenue_organic + a.doplaty; }
+function aggSales(a){ return a.sales_target + a.sales_organic; }
+function aggLeads(a){ return a.leads_target + a.leads_organic; }
+function aggRejects(a){ return a.reject_offhours+a.reject_no_number+a.reject_no_answer+a.reject_nontarget; }
+
+function planSum(dateList, projects, metric){
+  const plan = {}; projects.forEach(p=>plan[p]=0);
+  dateList.forEach(d => projects.forEach(p => { plan[p]+=proratedPlan(d,p,metric); }));
+  return plan;
+}
+
+// =================== ОСНОВНОЙ РЕНДЕР (зависит от фильтра) ===================
 function renderRange(start, end, label){
   document.getElementById('period-caption').textContent =
     label + ' (' + toISO(start) + ' — ' + toISO(end) + ')';
   const startISO = toISO(start), endISO = toISO(end);
   const filtered = DATA.daily.filter(r => r.date >= startISO && r.date <= endISO);
   const dateList = eachDate(start, end);
+  const agg = aggregate(filtered, DATA.projects);
+  const planRevenue = planSum(dateList, DATA.projects, 'revenue');
 
-  const empty = () => ({leads_target:0, leads_organic:0, budget_spent:0, pu_records:0, pu_attended:0, sales_count:0, revenue:0});
-  const agg = {}; DATA.projects.forEach(p => agg[p] = empty());
-  filtered.forEach(r => {
-    if (!agg[r.project]) agg[r.project] = empty();
-    const a = agg[r.project];
-    a.leads_target += r.leads_target; a.leads_organic += r.leads_organic;
-    a.budget_spent += r.budget_spent; a.pu_records += r.pu_records;
-    a.pu_attended += r.pu_attended; a.sales_count += r.sales_count;
-    a.revenue += r.revenue + r.doplaty;
-  });
+  // ---- предыдущий период той же длины (для сравнения) ----
+  const periodLen = dateList.length;
+  const prevEnd = addDays(start, -1);
+  const prevStart = addDays(prevEnd, -(periodLen-1));
+  const prevFiltered = DATA.daily.filter(r => r.date >= toISO(prevStart) && r.date <= toISO(prevEnd));
+  const prevAgg = aggregate(prevFiltered, DATA.projects);
 
-  const metrics = ['revenue','leads_target','leads_organic','budget','pu_records','sales_count'];
-  const plan = {}; DATA.projects.forEach(p => { plan[p] = {}; metrics.forEach(m => plan[p][m]=0); });
-  dateList.forEach(d => DATA.projects.forEach(p => metrics.forEach(m => { plan[p][m] += proratedPlan(d,p,m); })));
-
-  const totalFact = DATA.projects.reduce((s,p)=>s+agg[p].revenue,0);
-  const totalPlan = DATA.projects.reduce((s,p)=>s+plan[p].revenue,0);
+  const totalFact = DATA.projects.reduce((s,p)=>s+aggRevenue(agg[p]),0);
+  const totalPlan = DATA.projects.reduce((s,p)=>s+planRevenue[p],0);
   const totalPct = totalPlan ? (totalFact/totalPlan*100) : 0;
+  const totalPrev = DATA.projects.reduce((s,p)=>s+aggRevenue(prevAgg[p]),0);
+  const totalDeltaPct = totalPrev ? ((totalFact-totalPrev)/totalPrev*100) : null;
 
-  // ---- 1. Карточки приход ----
+  // ---- Карточки ----
+  function deltaBadge(deltaPct){
+    if (deltaPct === null) return '';
+    const up = deltaPct >= 0;
+    return `<div class="card-delta ${up?'up':'down'}">${up?'▲':'▼'} ${Math.abs(deltaPct).toFixed(1)}% к пред. периоду</div>`;
+  }
+
   let cardsHtml = `
-    <div class="card metric">
+    <div class="card metric ${totalPct<ALERT_THRESHOLD?'alert':''}">
       <div class="label">ОБЩИЙ ПРИХОД</div>
       <div class="big">${fmtTg(totalFact)}</div>
       <div class="sub">План периода: ${fmtTg(totalPlan)}</div>
@@ -287,13 +398,18 @@ function renderRange(start, end, label){
         <div class="ring-inner"><div class="pct" style="color:var(--amber)">${totalPct.toFixed(1)}%</div></div>
       </div>
       <div class="ring-caption">% от плана периода</div>
+      <div class="card-lag ${(totalFact-totalPlan)<0?'behind':'ahead'}">${(totalFact-totalPlan)<0?'−':'+'}${fmtTg(Math.abs(totalFact-totalPlan))} ${(totalFact-totalPlan)<0?'от плана':'к плану'}</div>
+      ${deltaBadge(totalDeltaPct)}
     </div>`;
   DATA.projects.forEach((p, idx) => {
-    const pl = plan[p].revenue, fa = agg[p].revenue;
+    const pl = planRevenue[p], fa = aggRevenue(agg[p]);
     const pct = pl ? (fa/pl*100) : 0;
+    const diff = fa - pl;
+    const prevFa = aggRevenue(prevAgg[p]);
+    const deltaPct = prevFa ? ((fa-prevFa)/prevFa*100) : null;
     const color = colorFor(idx);
     cardsHtml += `
-    <div class="card metric">
+    <div class="card metric ${pct<ALERT_THRESHOLD?'alert':''}">
       <div class="label">${p.toUpperCase()}</div>
       <div class="big">${fmtTg(fa)}</div>
       <div class="sub">План периода: ${fmtTg(pl)}</div>
@@ -301,80 +417,303 @@ function renderRange(start, end, label){
         <div class="ring-inner"><div class="pct" style="color:${color}">${pct.toFixed(1)}%</div></div>
       </div>
       <div class="ring-caption">% от плана периода</div>
+      <div class="card-lag ${diff<0?'behind':'ahead'}">${diff<0?'−':'+'}${fmtTg(Math.abs(diff))} ${diff<0?'от плана':'к плану'}</div>
+      ${deltaBadge(deltaPct)}
     </div>`;
   });
   document.getElementById('cards-row').innerHTML = cardsHtml;
 
   renderChart(dateList, filtered);
+  renderFunnel(agg);
+  renderLeadsTable(agg, planRevenue, dateList);
+  renderCplChart(dateList, filtered);
+  renderCheckChart(dateList, filtered);
+  renderRejects(agg);
+  renderSourceTable(agg);
+  renderPuTable(agg, dateList);
+  renderSalesTable(agg, planRevenue, dateList);
+  renderSmm(startISO, endISO);
+}
 
-  // ---- 2. Отставание/опережение в тг ----
-  let lagHtml = '';
-  const totalDiff = totalFact - totalPlan;
-  lagHtml += `<div class="lag-row ${totalDiff<0?'behind':'ahead'}"><span class="name">ИТОГО ПО КОМПАНИИ</span><span class="amount">${totalDiff<0?'−':'+'}${fmtTg(Math.abs(totalDiff))}</span></div>`;
+// ---- Воронка ----
+function renderFunnel(agg){
+  let leads=0, records=0, attended=0, sales=0;
   DATA.projects.forEach(p => {
-    const diff = agg[p].revenue - plan[p].revenue;
-    lagHtml += `<div class="lag-row ${diff<0?'behind':'ahead'}"><span class="name">${p}</span><span class="amount">${diff<0?'−':'+'}${fmtTg(Math.abs(diff))}</span></div>`;
+    const a = agg[p];
+    leads += aggLeads(a); records += a.pu_records; attended += a.pu_attended; sales += aggSales(a);
   });
-  document.getElementById('lag-list').innerHTML = lagHtml;
+  const steps = [
+    {label:'Заявки', val:leads, color:'var(--purple)'},
+    {label:'Записи на ПУ', val:records, color:'var(--blue)'},
+    {label:'Дошли', val:attended, color:'var(--teal)'},
+    {label:'Продажи', val:sales, color:'var(--green-dark)'},
+  ];
+  const maxVal = steps[0].val || 1;
+  let html = '';
+  steps.forEach((s, i) => {
+    const width = (s.val/maxVal*100).toFixed(1);
+    const conv = i===0 ? '' : (steps[i-1].val ? (s.val/steps[i-1].val*100).toFixed(1)+'%' : '—');
+    html += `<div class="funnel-row">
+      <div class="flabel">${s.label}</div>
+      <div class="funnel-track"><div class="funnel-fill" style="width:${width}%; background:${s.color};">${fmtInt(s.val)}</div></div>
+      <div class="funnel-conv">${conv}</div>
+    </div>`;
+  });
+  document.getElementById('funnel').innerHTML = html;
+}
 
-  // ---- 3. Лиды / бюджет / CPL ----
-  let leadsRows = '';
+// ---- Лиды/бюджет/CPL таблица ----
+function renderLeadsTable(agg, planRevenue, dateList){
+  const planLT = planSum(dateList, DATA.projects, 'leads_target');
+  const planLO = planSum(dateList, DATA.projects, 'leads_organic');
+  const planB = planSum(dateList, DATA.projects, 'budget');
+  let rows = '';
   DATA.projects.forEach(p => {
-    const a = agg[p], pl = plan[p];
-    const cplPlan = pl.leads_target ? (pl.budget/pl.leads_target) : 0;
+    const a = agg[p];
+    const cplPlan = planLT[p] ? (planB[p]/planLT[p]) : 0;
     const cplFact = a.leads_target ? (a.budget_spent/a.leads_target) : 0;
-    leadsRows += `<tr>
+    rows += `<tr>
       <td>${p}</td>
-      <td class="num">${fmtInt(pl.leads_target)}</td><td class="num">${fmtInt(a.leads_target)}</td>
-      <td class="num">${fmtInt(pl.leads_organic)}</td><td class="num">${fmtInt(a.leads_organic)}</td>
-      <td class="num">${fmtTg(pl.budget)}</td><td class="num">${fmtTg(a.budget_spent)}</td>
+      <td class="num">${fmtInt(planLT[p])}</td><td class="num">${fmtInt(a.leads_target)}</td>
+      <td class="num">${fmtInt(planLO[p])}</td><td class="num">${fmtInt(a.leads_organic)}</td>
+      <td class="num">${fmtTg(planB[p])}</td><td class="num">${fmtTg(a.budget_spent)}</td>
       <td class="num">${fmtTg(cplPlan)}</td><td class="num ${cplFact>cplPlan?'neg':'pos'}">${fmtTg(cplFact)}</td>
     </tr>`;
   });
-  document.getElementById('leads-table-body').innerHTML = leadsRows;
+  document.getElementById('leads-table-body').innerHTML = rows;
+}
 
-  // ---- 4. ПУ ----
-  let puRows = '';
+// ---- Тренд CPL ----
+function lineChart(dateList, values, color, unit){
+  const n = dateList.length;
+  const w = Math.max(500, n*50), h = 160;
+  const padL=54,padR=10,padT=10,padB=30;
+  const plotW=w-padL-padR, plotH=h-padT-padB;
+  const maxV = Math.max(...values, 1) * 1.2;
+  const pts = values.map((v,i) => {
+    const x = padL + (n<=1?plotW/2:i*(plotW/(n-1)));
+    const y = padT + plotH - (v/maxV)*plotH;
+    return [x,y];
+  });
+  let svg = `<svg viewBox="0 0 ${w} ${h}" style="width:100%; height:auto; display:block;">`;
+  for (let i=0;i<=3;i++){
+    const y = padT+plotH-(plotH*i/3);
+    const val = maxV*i/3;
+    svg += `<line x1="${padL}" y1="${y}" x2="${w-padR}" y2="${y}" stroke="#e3edf7" stroke-width="1"/>`;
+    svg += `<text x="${padL-8}" y="${y+4}" text-anchor="end" font-size="9" fill="#6b7a90">${Math.round(val)}${unit||''}</text>`;
+  }
+  const poly = pts.map(p=>p.join(',')).join(' ');
+  svg += `<polyline points="${poly}" fill="none" stroke="${color}" stroke-width="2.2"/>`;
+  pts.forEach(([x,y],i) => { svg += `<circle cx="${x}" cy="${y}" r="3" fill="${color}"/>`; });
+  dateList.forEach((d,i) => {
+    if (n>14 && i%2!==0) return;
+    const label = d.getDate()+'.'+String(d.getMonth()+1).padStart(2,'0');
+    svg += `<text x="${pts[i][0]}" y="${h-padB+16}" text-anchor="middle" font-size="9" fill="#6b7a90">${label}</text>`;
+  });
+  svg += `</svg>`;
+  return svg;
+}
+
+function renderCplChart(dateList, filtered){
+  const byDate = {};
+  dateList.forEach(d => byDate[toISO(d)] = {budget:0, leads:0});
+  filtered.forEach(r => {
+    const b = byDate[r.date]; if (!b) return;
+    b.budget += r.budget_spent; b.leads += r.leads_target;
+  });
+  const values = dateList.map(d => {
+    const b = byDate[toISO(d)];
+    return b.leads ? b.budget/b.leads : 0;
+  });
+  document.getElementById('cpl-chart-wrap').innerHTML = lineChart(dateList, values, 'var(--red)', '');
+}
+
+function renderCheckChart(dateList, filtered){
+  const byDate = {};
+  dateList.forEach(d => byDate[toISO(d)] = {revenue:0, sales:0});
+  filtered.forEach(r => {
+    const b = byDate[r.date]; if (!b) return;
+    b.revenue += r.revenue_target + r.revenue_organic; b.sales += r.sales_target + r.sales_organic;
+  });
+  const values = dateList.map(d => {
+    const b = byDate[toISO(d)];
+    return b.sales ? b.revenue/b.sales : 0;
+  });
+  document.getElementById('check-chart-wrap').innerHTML = lineChart(dateList, values, 'var(--teal)', '');
+}
+
+// ---- Отказы по причинам ----
+function renderRejects(agg){
+  let offhours=0, noNumber=0, noAnswer=0, nontarget=0, leads=0;
   DATA.projects.forEach(p => {
-    const a = agg[p], pl = plan[p];
-    const pct = pl.pu_records ? (a.pu_records/pl.pu_records*100) : 0;
+    const a = agg[p];
+    offhours+=a.reject_offhours; noNumber+=a.reject_no_number;
+    noAnswer+=a.reject_no_answer; nontarget+=a.reject_nontarget;
+    leads += aggLeads(a);
+  });
+  const items = [
+    ['Вне рабочее время', offhours],
+    ['Недозвоны', noAnswer],
+    ['Лид без номера', noNumber],
+    ['Непрофильный отказ', nontarget],
+  ];
+  let rows = '';
+  let barsHtml = '<div class="bars" style="display:flex;flex-direction:column;gap:12px;">';
+  items.forEach(([name,val]) => {
+    const pct = leads ? (val/leads*100) : 0;
+    rows += `<tr><td>${name}</td><td class="num">${fmtInt(val)}</td><td class="num">${pct.toFixed(1)}%</td></tr>`;
+    barsHtml += `<div><div style="display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:4px;color:var(--navy-soft);font-weight:700;"><span>${name}</span><span>${pct.toFixed(1)}%</span></div>
+      <div style="height:12px;background:var(--blue-track);border-radius:7px;overflow:hidden;"><div style="height:100%;width:${Math.min(pct,100).toFixed(1)}%;background:var(--red);border-radius:7px;"></div></div></div>`;
+  });
+  const totalRejects = offhours+noNumber+noAnswer+nontarget;
+  rows += `<tr style="font-weight:800;background:#f7fafd;"><td>Итого отказов</td><td class="num">${fmtInt(totalRejects)}</td><td class="num">${leads?(totalRejects/leads*100).toFixed(1):0}%</td></tr>`;
+  barsHtml += '</div>';
+  document.getElementById('rejects-table-body').innerHTML = rows;
+  document.getElementById('rejects-bars').innerHTML = barsHtml;
+}
+
+// ---- Продажи по источникам ----
+function renderSourceTable(agg){
+  let targetCnt=0, targetRev=0, organicCnt=0, organicRev=0;
+  DATA.projects.forEach(p => {
+    const a = agg[p];
+    targetCnt+=a.sales_target; targetRev+=a.revenue_target;
+    organicCnt+=a.sales_organic; organicRev+=a.revenue_organic;
+  });
+  const totalCnt = targetCnt+organicCnt;
+  const rows = [
+    ['Таргет', targetCnt, targetRev],
+    ['Органика', organicCnt, organicRev],
+  ];
+  let html = '';
+  rows.forEach(([name,cnt,rev]) => {
+    const avgCheck = cnt ? rev/cnt : 0;
+    const share = totalCnt ? (cnt/totalCnt*100) : 0;
+    html += `<tr><td>${name}</td><td class="num">${fmtInt(cnt)}</td><td class="num">${fmtTg(rev)}</td><td class="num">${fmtTg(avgCheck)}</td><td class="num">${share.toFixed(1)}%</td></tr>`;
+  });
+  html += `<tr style="font-weight:800;background:#f7fafd;"><td>Итого</td><td class="num">${fmtInt(totalCnt)}</td><td class="num">${fmtTg(targetRev+organicRev)}</td><td class="num">${fmtTg(totalCnt?(targetRev+organicRev)/totalCnt:0)}</td><td class="num">100%</td></tr>`;
+  document.getElementById('source-table-body').innerHTML = html;
+}
+
+// ---- ПУ таблица ----
+function renderPuTable(agg, dateList){
+  const planPU = planSum(dateList, DATA.projects, 'pu_records');
+  let rows = '';
+  DATA.projects.forEach(p => {
+    const a = agg[p];
+    const pct = planPU[p] ? (a.pu_records/planPU[p]*100) : 0;
     const doh = a.pu_records ? (a.pu_attended/a.pu_records*100) : 0;
-    puRows += `<tr>
+    rows += `<tr>
       <td>${p}</td>
-      <td class="num">${fmtInt(pl.pu_records)}</td>
+      <td class="num">${fmtInt(planPU[p])}</td>
       <td class="num">${fmtInt(a.pu_records)}</td>
       <td class="num ${pct>=100?'pos':'neg'}">${pct.toFixed(1)}%</td>
       <td class="num">${fmtInt(a.pu_attended)}</td>
       <td class="num">${doh.toFixed(1)}%</td>
     </tr>`;
   });
-  document.getElementById('pu-table-body').innerHTML = puRows;
+  document.getElementById('pu-table-body').innerHTML = rows;
+}
 
-  // ---- 5. Продажи ----
-  let salesRows = '';
+// ---- Продажи план/факт ----
+function renderSalesTable(agg, planRevenue, dateList){
+  const planSC = planSum(dateList, DATA.projects, 'sales_count');
+  let rows = '';
   DATA.projects.forEach(p => {
-    const a = agg[p], pl = plan[p];
-    const pctCnt = pl.sales_count ? (a.sales_count/pl.sales_count*100) : 0;
-    const pctRev = pl.revenue ? (a.revenue/pl.revenue*100) : 0;
-    salesRows += `<tr>
+    const a = agg[p];
+    const factCnt = aggSales(a), factRev = aggRevenue(a);
+    const pctCnt = planSC[p] ? (factCnt/planSC[p]*100) : 0;
+    const pctRev = planRevenue[p] ? (factRev/planRevenue[p]*100) : 0;
+    rows += `<tr>
       <td>${p}</td>
-      <td class="num">${fmtInt(pl.sales_count)}</td>
-      <td class="num">${fmtInt(a.sales_count)}</td>
+      <td class="num">${fmtInt(planSC[p])}</td>
+      <td class="num">${fmtInt(factCnt)}</td>
       <td class="num ${pctCnt>=100?'pos':'neg'}">${pctCnt.toFixed(1)}%</td>
-      <td class="num">${fmtTg(pl.revenue)}</td>
-      <td class="num">${fmtTg(a.revenue)}</td>
+      <td class="num">${fmtTg(planRevenue[p])}</td>
+      <td class="num">${fmtTg(factRev)}</td>
       <td class="num ${pctRev>=100?'pos':'neg'}">${pctRev.toFixed(1)}%</td>
     </tr>`;
   });
-  document.getElementById('sales-table-body').innerHTML = salesRows;
+  document.getElementById('sales-table-body').innerHTML = rows;
 }
 
+// ---- СММ ----
+function renderSmm(startISO, endISO){
+  if (!DATA.smm || DATA.smm.length===0){
+    document.getElementById('smm-title').style.display='none';
+    document.getElementById('smm-row').innerHTML='';
+    return;
+  }
+  document.getElementById('smm-title').style.display='block';
+  const filtered = DATA.smm.filter(r => r.date>=startISO && r.date<=endISO);
+  const sum = (key) => filtered.reduce((s,r)=>s+r[key],0);
+  const cards = [
+    ['ПРОСМОТРЫ', sum('views'), ''],
+    ['НОВЫЕ ПОДПИСЧИКИ', sum('new_followers'), ''],
+    ['ОХВАЧЕННЫЕ АККАУНТЫ', sum('reach'), ''],
+    ['ВЗАИМОДЕЙСТВИЯ', sum('engagement'), ''],
+  ];
+  let html = '';
+  cards.forEach(([label,val]) => {
+    html += `<div class="card metric">
+      <div class="label">${label}</div>
+      <div class="big">${fmtInt(val)}</div>
+      <div class="sub">за выбранный период</div>
+    </div>`;
+  });
+  document.getElementById('smm-row').innerHTML = html;
+}
+
+// =================== ПРОГНОЗ (не зависит от фильтра, всегда текущий месяц) ===================
+function renderForecast(){
+  const today = new Date(); today.setHours(0,0,0,0);
+  const mk = monthKey(today);
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  const daysPassed = Math.floor((today-monthStart)/86400000)+1;
+  const totalDaysInMonth = daysInMonth(today.getFullYear(), today.getMonth());
+
+  const monthRows = DATA.daily.filter(r => r.date.slice(0,7)===mk);
+  const agg = aggregate(monthRows, DATA.projects);
+
+  document.getElementById('forecast-hint').textContent =
+    `На основе темпа первых ${daysPassed} дн. из ${totalDaysInMonth} в месяце ${mk}`;
+
+  const planMonth = {}; DATA.projects.forEach(p => planMonth[p] = (DATA.plans[mk] && DATA.plans[mk][p]) ? DATA.plans[mk][p].revenue : 0);
+
+  let html = '';
+  let totalForecast=0, totalPlan=0, totalFactSoFar=0;
+  DATA.projects.forEach((p, idx) => {
+    const factSoFar = aggRevenue(agg[p]);
+    const runRate = daysPassed ? factSoFar/daysPassed : 0;
+    const forecast = runRate*totalDaysInMonth;
+    const plan = planMonth[p];
+    const pct = plan ? (forecast/plan*100) : 0;
+    totalForecast += forecast; totalPlan += plan; totalFactSoFar += factSoFar;
+    const color = colorFor(idx);
+    html += `<div class="card metric ${pct<ALERT_THRESHOLD?'alert':''}">
+      <div class="label">${p.toUpperCase()}</div>
+      <div class="big">${fmtTg(forecast)}</div>
+      <div class="sub">Факт сейчас: ${fmtTg(factSoFar)} · План: ${fmtTg(plan)}</div>
+      <div class="card-lag ${pct<100?'behind':'ahead'}">${pct.toFixed(0)}% от плана к концу месяца</div>
+    </div>`;
+  });
+  const totalPct = totalPlan ? (totalForecast/totalPlan*100) : 0;
+  html = `<div class="card metric ${totalPct<ALERT_THRESHOLD?'alert':''}">
+      <div class="label">ВСЕГО ПО КОМПАНИИ</div>
+      <div class="big">${fmtTg(totalForecast)}</div>
+      <div class="sub">Факт сейчас: ${fmtTg(totalFactSoFar)} · План: ${fmtTg(totalPlan)}</div>
+      <div class="card-lag ${totalPct<100?'behind':'ahead'}">${totalPct.toFixed(0)}% от плана к концу месяца</div>
+    </div>` + html;
+  document.getElementById('forecast-row').innerHTML = html;
+}
+
+// =================== ГРАФИК ПРИХОДА ПО ДНЯМ ===================
 function renderChart(dateList, filtered){
   const byDateProject = {};
   dateList.forEach(d => { byDateProject[toISO(d)] = {}; });
   filtered.forEach(r => {
     if (!byDateProject[r.date]) byDateProject[r.date] = {};
-    byDateProject[r.date][r.project] = (byDateProject[r.date][r.project]||0) + r.revenue + r.doplaty;
+    byDateProject[r.date][r.project] = (byDateProject[r.date][r.project]||0) + r.revenue_target + r.revenue_organic + r.doplaty;
   });
   const n = dateList.length;
   const w = Math.max(600, n*46), h = 220;
@@ -418,6 +757,7 @@ function renderChart(dateList, filtered){
   document.getElementById('chart-legend').innerHTML = legend;
 }
 
+// =================== ФИЛЬТРЫ ===================
 function setActiveButton(btn){
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
@@ -446,6 +786,7 @@ document.getElementById('apply-custom').addEventListener('click', () => {
   renderRange(new Date(from), new Date(to), 'Свой период');
 });
 
+renderForecast();
 applyPreset('thismonth', document.querySelector('[data-preset="thismonth"]'));
 </script>
 </body>
