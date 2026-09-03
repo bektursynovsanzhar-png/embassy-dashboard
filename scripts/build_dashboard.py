@@ -124,6 +124,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .row{ display:grid; gap:16px; margin-bottom:16px; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); }
 
   .hero-grid{ display:grid; grid-template-columns: 1.15fr 2fr; gap:16px; margin-bottom:16px; align-items:stretch; }
+  #total-card-wrap{ display:flex; }
+  #total-card-wrap > .card{ flex:1; }
   .hero-projects{ display:grid; grid-template-columns: repeat(2, 1fr); gap:16px; }
   .card-hero{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; }
   .card-hero .label{ font-size:13px; font-weight:800; color:var(--navy-soft); letter-spacing:0.5px; }
@@ -330,7 +332,12 @@ document.getElementById('generated-at').textContent = 'Данные обновл
 
 function fmtTg(v){ return Math.round(v).toLocaleString('ru-RU') + ' тг'; }
 function fmtInt(v){ return Math.round(v).toLocaleString('ru-RU'); }
-function toISO(d){ return d.toISOString().slice(0,10); }
+function toISO(d){
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
 function daysInMonth(y, mIdx){ return new Date(y, mIdx+1, 0).getDate(); }
 function monthKey(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); }
 function addDays(d, n){ const r = new Date(d); r.setDate(r.getDate()+n); return r; }
