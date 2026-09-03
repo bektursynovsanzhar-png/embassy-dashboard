@@ -21,6 +21,23 @@
   .card{ background:var(--card); border:1px solid var(--border); border-radius:16px; box-shadow:0 2px 10px rgba(23,57,99,0.05); padding:18px 20px; }
   .card.alert{ border:2px solid var(--red); background:#fff8f7; }
   .row{ display:grid; gap:16px; margin-bottom:16px; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); }
+
+  .hero-grid{ display:grid; grid-template-columns: 1.15fr 2fr; gap:16px; margin-bottom:16px; align-items:stretch; }
+  .hero-projects{ display:grid; grid-template-columns: repeat(2, 1fr); gap:16px; }
+  .card-hero{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; }
+  .card-hero .label{ font-size:13px; font-weight:800; color:var(--navy-soft); letter-spacing:0.5px; }
+  .card-hero .big{ font-size:34px; font-weight:800; color:var(--navy); }
+  .card-hero .sub{ font-size:12px; color:var(--gray); }
+  .card-hero .ring{ width:128px; height:128px; margin-top:4px; }
+  .card-hero .ring-inner{ inset:11px; }
+  .card-hero .ring-inner .pct{ font-size:20px; }
+  .card-hero .ring-caption{ font-size:11px; }
+  .card-hero .card-lag{ font-size:13px; padding:5px 14px; }
+  .card-hero .card-delta{ font-size:12px; }
+  @media (max-width: 720px){
+    .hero-grid{ grid-template-columns: 1fr; }
+    .hero-projects{ grid-template-columns: repeat(2, 1fr); }
+  }
   .row-2{ grid-template-columns: repeat(auto-fit, minmax(340px,1fr)); }
   .metric{ text-align:center; display:flex; flex-direction:column; align-items:center; gap:6px; }
   .metric .label{ font-size:11.5px; font-weight:800; color:var(--navy-soft); }
@@ -93,7 +110,10 @@
   <div class="period-caption" id="period-caption"></div>
 
   <!-- ПРИХОД: план/факт/отставание/сравнение с прошлым периодом -->
-  <div class="row" id="cards-row"></div>
+  <div class="hero-grid">
+    <div id="total-card-wrap"></div>
+    <div class="hero-projects" id="cards-row"></div>
+  </div>
 
   <!-- ПРОГНОЗ НА КОНЕЦ МЕСЯЦА (не зависит от фильтра) -->
   <div class="section-title">ПРОГНОЗ НА КОНЕЦ МЕСЯЦА</div>
@@ -146,18 +166,20 @@
     </div>
   </div>
 
-  <!-- ОТКАЗЫ ПО ПРИЧИНАМ -->
-  <div class="section-title">ОТКАЗЫ ЛИДОВ ПО ПРИЧИНАМ</div>
+  <!-- НЕКАЧЕСТВЕННЫЙ ТРАФИК -->
+  <div class="section-title">НЕКАЧЕСТВЕННЫЙ ТРАФИК</div>
+  <div class="section-hint">Лиды, ушедшие в отказ день в день</div>
+  <div class="row" id="reject-total-row" style="margin-bottom:16px;"></div>
   <div class="row row-2">
     <div class="card">
-      <div class="card-title">ПРИЧИНЫ ОТКАЗОВ ЗА ПЕРИОД</div>
+      <div class="card-title">РАЗБИВКА ПО ПРИЧИНАМ</div>
       <table>
         <tr><th>Причина</th><th class="num">Кол-во</th><th class="num">% от заявок</th></tr>
         <tbody id="rejects-table-body"></tbody>
       </table>
     </div>
     <div class="card">
-      <div class="card-title">ДОЛЯ ОТКАЗОВ ОТ ЗАЯВОК</div>
+      <div class="card-title">ДОЛЯ ОТ ЗАЯВОК</div>
       <div id="rejects-bars"></div>
     </div>
   </div>
@@ -196,7 +218,7 @@
   <p class="updated">Данные пересобираются автоматически при внесении новых записей. Фильтр периода и графики работают прямо в браузере.</p>
 </div>
 
-<script id="dashboard-data" type="application/json">{"daily": [{"date": "2026-09-01", "project": "Варламова", "channel": "оффлайн", "leads_target": 60.0, "leads_organic": 16.0, "budget_spent": 21500.0, "reject_offhours": 22.0, "reject_no_number": 10.0, "reject_no_answer": 14.0, "reject_nontarget": 1.0, "pu_records": 30.0, "pu_attended": 17.0, "sales_target": 3.0, "sales_organic": 1.0, "revenue_target": 880000.0, "revenue_organic": 240000.0, "doplaty": 0.0}, {"date": "2026-09-01", "project": "Самал", "channel": "оффлайн", "leads_target": 34.0, "leads_organic": 9.0, "budget_spent": 12500.0, "reject_offhours": 11.0, "reject_no_number": 5.0, "reject_no_answer": 7.0, "reject_nontarget": 0.0, "pu_records": 17.0, "pu_attended": 10.0, "sales_target": 2.0, "sales_organic": 0.0, "revenue_target": 560000.0, "revenue_organic": 0.0, "doplaty": 0.0}, {"date": "2026-09-01", "project": "Астана", "channel": "оффлайн", "leads_target": 17.0, "leads_organic": 4.0, "budget_spent": 6500.0, "reject_offhours": 6.0, "reject_no_number": 3.0, "reject_no_answer": 4.0, "reject_nontarget": 0.0, "pu_records": 9.0, "pu_attended": 5.0, "sales_target": 1.0, "sales_organic": 0.0, "revenue_target": 280000.0, "revenue_organic": 0.0, "doplaty": 0.0}, {"date": "2026-09-01", "project": "Онлайн", "channel": "онлайн", "leads_target": 51.0, "leads_organic": 12.0, "budget_spent": 10000.0, "reject_offhours": 18.0, "reject_no_number": 8.0, "reject_no_answer": 11.0, "reject_nontarget": 1.0, "pu_records": 26.0, "pu_attended": 14.0, "sales_target": 2.0, "sales_organic": 0.0, "revenue_target": 420000.0, "revenue_organic": 0.0, "doplaty": 0.0}, {"date": "2026-09-02", "project": "Варламова", "channel": "оффлайн", "leads_target": 63.0, "leads_organic": 17.0, "budget_spent": 21800.0, "reject_offhours": 20.0, "reject_no_number": 11.0, "reject_no_answer": 13.0, "reject_nontarget": 1.0, "pu_records": 32.0, "pu_attended": 18.0, "sales_target": 3.0, "sales_organic": 1.0, "revenue_target": 880000.0, "revenue_organic": 240000.0, "doplaty": 50000.0}, {"date": "2026-09-02", "project": "Самал", "channel": "оффлайн", "leads_target": 32.0, "leads_organic": 8.0, "budget_spent": 12600.0, "reject_offhours": 10.0, "reject_no_number": 6.0, "reject_no_answer": 6.0, "reject_nontarget": 0.0, "pu_records": 16.0, "pu_attended": 9.0, "sales_target": 2.0, "sales_organic": 0.0, "revenue_target": 560000.0, "revenue_organic": 0.0, "doplaty": 0.0}, {"date": "2026-09-02", "project": "Астана", "channel": "оффлайн", "leads_target": 16.0, "leads_organic": 4.0, "budget_spent": 6600.0, "reject_offhours": 7.0, "reject_no_number": 2.0, "reject_no_answer": 4.0, "reject_nontarget": 0.0, "pu_records": 8.0, "pu_attended": 4.0, "sales_target": 1.0, "sales_organic": 0.0, "revenue_target": 280000.0, "revenue_organic": 0.0, "doplaty": 0.0}, {"date": "2026-09-02", "project": "Онлайн", "channel": "онлайн", "leads_target": 55.0, "leads_organic": 13.0, "budget_spent": 10200.0, "reject_offhours": 19.0, "reject_no_number": 9.0, "reject_no_answer": 10.0, "reject_nontarget": 1.0, "pu_records": 28.0, "pu_attended": 15.0, "sales_target": 3.0, "sales_organic": 0.0, "revenue_target": 630000.0, "revenue_organic": 0.0, "doplaty": 0.0}, {"date": "2026-09-03", "project": "Варламова", "channel": "оффлайн", "leads_target": 47.0, "leads_organic": 13.0, "budget_spent": 21600.0, "reject_offhours": 25.0, "reject_no_number": 12.0, "reject_no_answer": 15.0, "reject_nontarget": 2.0, "pu_records": 24.0, "pu_attended": 13.0, "sales_target": 2.0, "sales_organic": 1.0, "revenue_target": 600000.0, "revenue_organic": 240000.0, "doplaty": 0.0}, {"date": "2026-09-03", "project": "Самал", "channel": "оффлайн", "leads_target": 28.0, "leads_organic": 7.0, "budget_spent": 12400.0, "reject_offhours": 12.0, "reject_no_number": 5.0, "reject_no_answer": 7.0, "reject_nontarget": 0.0, "pu_records": 14.0, "pu_attended": 8.0, "sales_target": 1.0, "sales_organic": 0.0, "revenue_target": 280000.0, "revenue_organic": 0.0, "doplaty": 20000.0}, {"date": "2026-09-03", "project": "Астана", "channel": "оффлайн", "leads_target": 14.0, "leads_organic": 4.0, "budget_spent": 6400.0, "reject_offhours": 8.0, "reject_no_number": 3.0, "reject_no_answer": 5.0, "reject_nontarget": 1.0, "pu_records": 7.0, "pu_attended": 4.0, "sales_target": 0.0, "sales_organic": 0.0, "revenue_target": 0.0, "revenue_organic": 0.0, "doplaty": 0.0}, {"date": "2026-09-03", "project": "Онлайн", "channel": "онлайн", "leads_target": 43.0, "leads_organic": 10.0, "budget_spent": 9900.0, "reject_offhours": 17.0, "reject_no_number": 7.0, "reject_no_answer": 9.0, "reject_nontarget": 1.0, "pu_records": 22.0, "pu_attended": 12.0, "sales_target": 2.0, "sales_organic": 0.0, "revenue_target": 420000.0, "revenue_organic": 0.0, "doplaty": 0.0}], "plans": {"2026-09": {"Варламова": {"revenue": 35000000.0, "leads_target": 1800.0, "leads_organic": 475.0, "budget": 650000.0, "pu_records": 910.0, "sales_count": 125.0}, "Самал": {"revenue": 20000000.0, "leads_target": 1030.0, "leads_organic": 280.0, "budget": 380000.0, "pu_records": 524.0, "sales_count": 72.0}, "Астана": {"revenue": 10000000.0, "leads_target": 520.0, "leads_organic": 135.0, "budget": 200000.0, "pu_records": 262.0, "sales_count": 36.0}, "Онлайн": {"revenue": 15000000.0, "leads_target": 1550.0, "leads_organic": 378.0, "budget": 300000.0, "pu_records": 771.0, "sales_count": 72.0}}}, "smm": [{"date": "2026-09-01", "views": 24500.0, "new_followers": 120.0, "reach": 18200.0, "engagement": 2100.0}, {"date": "2026-09-02", "views": 26800.0, "new_followers": 145.0, "reach": 19500.0, "engagement": 2340.0}, {"date": "2026-09-03", "views": 21300.0, "new_followers": 98.0, "reach": 16800.0, "engagement": 1890.0}], "projects": ["Варламова", "Самал", "Астана", "Онлайн"], "generatedAt": "03.09.2026 08:32"}</script>
+<script id="dashboard-data" type="application/json">{"daily": [{"date": "2026-09-01", "project": "Варламова", "channel": "оффлайн", "leads_target": 60.0, "leads_organic": 16.0, "budget_spent": 21500.0, "reject_nontarget": 4.0, "reject_accidental": 15.0, "reject_no_number": 10.0, "pu_records": 30.0, "pu_attended": 17.0, "sales_target": 3.0, "sales_organic": 1.0, "revenue_target": 880000.0, "revenue_organic": 240000.0, "doplaty": 0.0}, {"date": "2026-09-01", "project": "Самал", "channel": "оффлайн", "leads_target": 34.0, "leads_organic": 9.0, "budget_spent": 12500.0, "reject_nontarget": 2.0, "reject_accidental": 9.0, "reject_no_number": 5.0, "pu_records": 17.0, "pu_attended": 10.0, "sales_target": 2.0, "sales_organic": 0.0, "revenue_target": 560000.0, "revenue_organic": 0.0, "doplaty": 0.0}, {"date": "2026-09-01", "project": "Астана", "channel": "оффлайн", "leads_target": 17.0, "leads_organic": 4.0, "budget_spent": 6500.0, "reject_nontarget": 1.0, "reject_accidental": 5.0, "reject_no_number": 3.0, "pu_records": 9.0, "pu_attended": 5.0, "sales_target": 1.0, "sales_organic": 0.0, "revenue_target": 280000.0, "revenue_organic": 0.0, "doplaty": 0.0}, {"date": "2026-09-01", "project": "Онлайн", "channel": "онлайн", "leads_target": 51.0, "leads_organic": 12.0, "budget_spent": 10000.0, "reject_nontarget": 3.0, "reject_accidental": 13.0, "reject_no_number": 8.0, "pu_records": 26.0, "pu_attended": 14.0, "sales_target": 2.0, "sales_organic": 0.0, "revenue_target": 420000.0, "revenue_organic": 0.0, "doplaty": 0.0}, {"date": "2026-09-02", "project": "Варламова", "channel": "оффлайн", "leads_target": 63.0, "leads_organic": 17.0, "budget_spent": 21800.0, "reject_nontarget": 4.0, "reject_accidental": 14.0, "reject_no_number": 11.0, "pu_records": 32.0, "pu_attended": 18.0, "sales_target": 3.0, "sales_organic": 1.0, "revenue_target": 880000.0, "revenue_organic": 240000.0, "doplaty": 50000.0}, {"date": "2026-09-02", "project": "Самал", "channel": "оффлайн", "leads_target": 32.0, "leads_organic": 8.0, "budget_spent": 12600.0, "reject_nontarget": 2.0, "reject_accidental": 8.0, "reject_no_number": 6.0, "pu_records": 16.0, "pu_attended": 9.0, "sales_target": 2.0, "sales_organic": 0.0, "revenue_target": 560000.0, "revenue_organic": 0.0, "doplaty": 0.0}, {"date": "2026-09-02", "project": "Астана", "channel": "оффлайн", "leads_target": 16.0, "leads_organic": 4.0, "budget_spent": 6600.0, "reject_nontarget": 1.0, "reject_accidental": 4.0, "reject_no_number": 2.0, "pu_records": 8.0, "pu_attended": 4.0, "sales_target": 1.0, "sales_organic": 0.0, "revenue_target": 280000.0, "revenue_organic": 0.0, "doplaty": 0.0}, {"date": "2026-09-02", "project": "Онлайн", "channel": "онлайн", "leads_target": 55.0, "leads_organic": 13.0, "budget_spent": 10200.0, "reject_nontarget": 3.0, "reject_accidental": 12.0, "reject_no_number": 9.0, "pu_records": 28.0, "pu_attended": 15.0, "sales_target": 3.0, "sales_organic": 0.0, "revenue_target": 630000.0, "revenue_organic": 0.0, "doplaty": 0.0}, {"date": "2026-09-03", "project": "Варламова", "channel": "оффлайн", "leads_target": 47.0, "leads_organic": 13.0, "budget_spent": 21600.0, "reject_nontarget": 5.0, "reject_accidental": 16.0, "reject_no_number": 12.0, "pu_records": 24.0, "pu_attended": 13.0, "sales_target": 2.0, "sales_organic": 1.0, "revenue_target": 600000.0, "revenue_organic": 240000.0, "doplaty": 0.0}, {"date": "2026-09-03", "project": "Самал", "channel": "оффлайн", "leads_target": 28.0, "leads_organic": 7.0, "budget_spent": 12400.0, "reject_nontarget": 2.0, "reject_accidental": 8.0, "reject_no_number": 5.0, "pu_records": 14.0, "pu_attended": 8.0, "sales_target": 1.0, "sales_organic": 0.0, "revenue_target": 280000.0, "revenue_organic": 0.0, "doplaty": 20000.0}, {"date": "2026-09-03", "project": "Астана", "channel": "оффлайн", "leads_target": 14.0, "leads_organic": 4.0, "budget_spent": 6400.0, "reject_nontarget": 2.0, "reject_accidental": 6.0, "reject_no_number": 3.0, "pu_records": 7.0, "pu_attended": 4.0, "sales_target": 0.0, "sales_organic": 0.0, "revenue_target": 0.0, "revenue_organic": 0.0, "doplaty": 0.0}, {"date": "2026-09-03", "project": "Онлайн", "channel": "онлайн", "leads_target": 43.0, "leads_organic": 10.0, "budget_spent": 9900.0, "reject_nontarget": 3.0, "reject_accidental": 11.0, "reject_no_number": 7.0, "pu_records": 22.0, "pu_attended": 12.0, "sales_target": 2.0, "sales_organic": 0.0, "revenue_target": 420000.0, "revenue_organic": 0.0, "doplaty": 0.0}], "plans": {"2026-09": {"Варламова": {"revenue": 35000000.0, "leads_target": 1800.0, "leads_organic": 475.0, "budget": 650000.0, "pu_records": 910.0, "sales_count": 125.0}, "Самал": {"revenue": 20000000.0, "leads_target": 1030.0, "leads_organic": 280.0, "budget": 380000.0, "pu_records": 524.0, "sales_count": 72.0}, "Астана": {"revenue": 10000000.0, "leads_target": 520.0, "leads_organic": 135.0, "budget": 200000.0, "pu_records": 262.0, "sales_count": 36.0}, "Онлайн": {"revenue": 15000000.0, "leads_target": 1550.0, "leads_organic": 378.0, "budget": 300000.0, "pu_records": 771.0, "sales_count": 72.0}}}, "smm": [{"date": "2026-09-01", "views": 24500.0, "new_followers": 120.0, "reach": 18200.0, "engagement": 2100.0}, {"date": "2026-09-02", "views": 26800.0, "new_followers": 145.0, "reach": 19500.0, "engagement": 2340.0}, {"date": "2026-09-03", "views": 21300.0, "new_followers": 98.0, "reach": 16800.0, "engagement": 1890.0}], "projects": ["Варламова", "Самал", "Астана", "Онлайн"], "generatedAt": "03.09.2026 10:20"}</script>
 <script>
 const DATA = JSON.parse(document.getElementById('dashboard-data').textContent);
 const PROJECT_COLORS = ['#2f6fb0', '#3aa0a0', '#e0a63a', '#6fbf5e', '#8a4fe0', '#e2574c'];
@@ -227,7 +249,7 @@ function eachDate(start, end){
 
 function emptyAgg(){
   return {leads_target:0, leads_organic:0, budget_spent:0,
-    reject_offhours:0, reject_no_number:0, reject_no_answer:0, reject_nontarget:0,
+    reject_nontarget:0, reject_accidental:0, reject_no_number:0,
     pu_records:0, pu_attended:0,
     sales_target:0, sales_organic:0, revenue_target:0, revenue_organic:0, doplaty:0};
 }
@@ -238,8 +260,8 @@ function aggregate(rows, projects){
     if (!agg[r.project]) agg[r.project]=emptyAgg();
     const a = agg[r.project];
     a.leads_target+=r.leads_target; a.leads_organic+=r.leads_organic; a.budget_spent+=r.budget_spent;
-    a.reject_offhours+=r.reject_offhours; a.reject_no_number+=r.reject_no_number;
-    a.reject_no_answer+=r.reject_no_answer; a.reject_nontarget+=r.reject_nontarget;
+    a.reject_nontarget+=r.reject_nontarget; a.reject_accidental+=r.reject_accidental;
+    a.reject_no_number+=r.reject_no_number;
     a.pu_records+=r.pu_records; a.pu_attended+=r.pu_attended;
     a.sales_target+=r.sales_target; a.sales_organic+=r.sales_organic;
     a.revenue_target+=r.revenue_target; a.revenue_organic+=r.revenue_organic; a.doplaty+=r.doplaty;
@@ -249,7 +271,7 @@ function aggregate(rows, projects){
 function aggRevenue(a){ return a.revenue_target + a.revenue_organic + a.doplaty; }
 function aggSales(a){ return a.sales_target + a.sales_organic; }
 function aggLeads(a){ return a.leads_target + a.leads_organic; }
-function aggRejects(a){ return a.reject_offhours+a.reject_no_number+a.reject_no_answer+a.reject_nontarget; }
+function aggRejects(a){ return a.reject_nontarget+a.reject_accidental+a.reject_no_number; }
 
 function planSum(dateList, projects, metric){
   const plan = {}; projects.forEach(p=>plan[p]=0);
@@ -287,8 +309,8 @@ function renderRange(start, end, label){
     return `<div class="card-delta ${up?'up':'down'}">${up?'▲':'▼'} ${Math.abs(deltaPct).toFixed(1)}% к пред. периоду</div>`;
   }
 
-  let cardsHtml = `
-    <div class="card metric ${totalPct<ALERT_THRESHOLD?'alert':''}">
+  let totalCardHtml = `
+    <div class="card metric card-hero ${totalPct<ALERT_THRESHOLD?'alert':''}">
       <div class="label">ОБЩИЙ ПРИХОД</div>
       <div class="big">${fmtTg(totalFact)}</div>
       <div class="sub">План периода: ${fmtTg(totalPlan)}</div>
@@ -299,6 +321,9 @@ function renderRange(start, end, label){
       <div class="card-lag ${(totalFact-totalPlan)<0?'behind':'ahead'}">${(totalFact-totalPlan)<0?'−':'+'}${fmtTg(Math.abs(totalFact-totalPlan))} ${(totalFact-totalPlan)<0?'от плана':'к плану'}</div>
       ${deltaBadge(totalDeltaPct)}
     </div>`;
+  document.getElementById('total-card-wrap').innerHTML = totalCardHtml;
+
+  let cardsHtml = '';
   DATA.projects.forEach((p, idx) => {
     const pl = planRevenue[p], fa = aggRevenue(agg[p]);
     const pct = pl ? (fa/pl*100) : 0;
@@ -440,20 +465,28 @@ function renderCheckChart(dateList, filtered){
   document.getElementById('check-chart-wrap').innerHTML = lineChart(dateList, values, 'var(--teal)', '');
 }
 
-// ---- Отказы по причинам ----
+// ---- Некачественный трафик ----
 function renderRejects(agg){
-  let offhours=0, noNumber=0, noAnswer=0, nontarget=0, leads=0;
+  let nontarget=0, accidental=0, noNumber=0, leads=0;
   DATA.projects.forEach(p => {
     const a = agg[p];
-    offhours+=a.reject_offhours; noNumber+=a.reject_no_number;
-    noAnswer+=a.reject_no_answer; nontarget+=a.reject_nontarget;
+    nontarget+=a.reject_nontarget; accidental+=a.reject_accidental; noNumber+=a.reject_no_number;
     leads += aggLeads(a);
   });
+  const totalRejects = nontarget+accidental+noNumber;
+  const totalPct = leads ? (totalRejects/leads*100) : 0;
+
+  document.getElementById('reject-total-row').innerHTML = `
+    <div class="card metric ${totalPct>40?'alert':''}">
+      <div class="label">НЕКАЧЕСТВЕННЫЙ ТРАФИК ЗА ПЕРИОД</div>
+      <div class="big">${fmtInt(totalRejects)}</div>
+      <div class="sub">${totalPct.toFixed(1)}% от ${fmtInt(leads)} заявок</div>
+    </div>`;
+
   const items = [
-    ['Вне рабочее время', offhours],
-    ['Недозвоны', noAnswer],
-    ['Лид без номера', noNumber],
-    ['Непрофильный отказ', nontarget],
+    ['Непрофильный лид', nontarget],
+    ['Не оставлял заявку', accidental],
+    ['Нет номера телефона', noNumber],
   ];
   let rows = '';
   let barsHtml = '<div class="bars" style="display:flex;flex-direction:column;gap:12px;">';
@@ -463,8 +496,7 @@ function renderRejects(agg){
     barsHtml += `<div><div style="display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:4px;color:var(--navy-soft);font-weight:700;"><span>${name}</span><span>${pct.toFixed(1)}%</span></div>
       <div style="height:12px;background:var(--blue-track);border-radius:7px;overflow:hidden;"><div style="height:100%;width:${Math.min(pct,100).toFixed(1)}%;background:var(--red);border-radius:7px;"></div></div></div>`;
   });
-  const totalRejects = offhours+noNumber+noAnswer+nontarget;
-  rows += `<tr style="font-weight:800;background:#f7fafd;"><td>Итого отказов</td><td class="num">${fmtInt(totalRejects)}</td><td class="num">${leads?(totalRejects/leads*100).toFixed(1):0}%</td></tr>`;
+  rows += `<tr style="font-weight:800;background:#f7fafd;"><td>Итого</td><td class="num">${fmtInt(totalRejects)}</td><td class="num">${totalPct.toFixed(1)}%</td></tr>`;
   barsHtml += '</div>';
   document.getElementById('rejects-table-body').innerHTML = rows;
   document.getElementById('rejects-bars').innerHTML = barsHtml;
@@ -606,6 +638,16 @@ function renderForecast(){
 }
 
 // =================== ГРАФИК ПРИХОДА ПО ДНЯМ ===================
+function fmtAxisTg(v){
+  if (v >= 1000000){
+    const m = v/1000000;
+    const mStr = Number.isInteger(m) ? String(m) : m.toFixed(1).replace('.', ',');
+    return mStr + ' млн';
+  }
+  if (v === 0) return '0';
+  return Math.round(v/1000) + ' тыс.';
+}
+
 function renderChart(dateList, filtered){
   const byDateProject = {};
   dateList.forEach(d => { byDateProject[toISO(d)] = {}; });
@@ -615,7 +657,7 @@ function renderChart(dateList, filtered){
   });
   const n = dateList.length;
   const w = Math.max(600, n*46), h = 220;
-  const padL=60,padR=10,padT=10,padB=34;
+  const padL=64,padR=10,padT=10,padB=34;
   const plotW=w-padL-padR, plotH=h-padT-padB;
   let maxDayTotal=0;
   dateList.forEach(d => {
@@ -623,16 +665,20 @@ function renderChart(dateList, filtered){
     const dayTotal = DATA.projects.reduce((s,p)=> s+(byDateProject[iso][p]||0),0);
     if (dayTotal>maxDayTotal) maxDayTotal=dayTotal;
   });
-  if (maxDayTotal===0) maxDayTotal=1;
-  const niceMax = maxDayTotal*1.15;
+  // Фиксированная сетка шагом 500 тыс., минимум до 5 млн, дальше расширяется тем же шагом
+  const GRID_STEP = 500000;
+  const MIN_TOP = 5000000;
+  const topValue = Math.max(MIN_TOP, Math.ceil((maxDayTotal*1.05) / GRID_STEP) * GRID_STEP);
+  const gridCount = topValue / GRID_STEP;
+
   const barW = Math.min(34, plotW/n*0.6);
   const step = plotW/n;
   let svg = `<svg viewBox="0 0 ${w} ${h}" style="width:100%; height:auto; display:block;">`;
-  for (let i=0;i<=4;i++){
-    const y = padT+plotH-(plotH*i/4);
-    const val = niceMax*i/4;
+  for (let i=0;i<=gridCount;i++){
+    const val = i*GRID_STEP;
+    const y = padT+plotH-(plotH*val/topValue);
     svg += `<line x1="${padL}" y1="${y}" x2="${w-padR}" y2="${y}" stroke="#e3edf7" stroke-width="1"/>`;
-    svg += `<text x="${padL-8}" y="${y+4}" text-anchor="end" font-size="10" fill="#6b7a90">${Math.round(val/1000)}k</text>`;
+    svg += `<text x="${padL-8}" y="${y+4}" text-anchor="end" font-size="10" fill="#6b7a90">${fmtAxisTg(val)}</text>`;
   }
   dateList.forEach((d,i) => {
     const iso=toISO(d);
@@ -641,7 +687,7 @@ function renderChart(dateList, filtered){
     DATA.projects.forEach((p,pi) => {
       const val = byDateProject[iso][p]||0;
       if (val<=0) return;
-      const barH = (val/niceMax)*plotH;
+      const barH = (val/topValue)*plotH;
       yCursor -= barH;
       svg += `<rect x="${x.toFixed(1)}" y="${yCursor.toFixed(1)}" width="${barW.toFixed(1)}" height="${barH.toFixed(1)}" fill="${colorFor(pi)}" rx="2"/>`;
     });

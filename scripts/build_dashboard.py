@@ -51,10 +51,9 @@ def build():
             "leads_target": num(row.get("leads_target")),
             "leads_organic": num(row.get("leads_organic")),
             "budget_spent": num(row.get("budget_spent")),
-            "reject_offhours": num(row.get("reject_offhours")),
-            "reject_no_number": num(row.get("reject_no_number")),
-            "reject_no_answer": num(row.get("reject_no_answer")),
             "reject_nontarget": num(row.get("reject_nontarget")),
+            "reject_accidental": num(row.get("reject_accidental")),
+            "reject_no_number": num(row.get("reject_no_number")),
             "pu_records": num(row.get("pu_records")),
             "pu_attended": num(row.get("pu_attended")),
             "sales_target": num(row.get("sales_target")),
@@ -123,6 +122,23 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .card{ background:var(--card); border:1px solid var(--border); border-radius:16px; box-shadow:0 2px 10px rgba(23,57,99,0.05); padding:18px 20px; }
   .card.alert{ border:2px solid var(--red); background:#fff8f7; }
   .row{ display:grid; gap:16px; margin-bottom:16px; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); }
+
+  .hero-grid{ display:grid; grid-template-columns: 1.15fr 2fr; gap:16px; margin-bottom:16px; align-items:stretch; }
+  .hero-projects{ display:grid; grid-template-columns: repeat(2, 1fr); gap:16px; }
+  .card-hero{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; }
+  .card-hero .label{ font-size:13px; font-weight:800; color:var(--navy-soft); letter-spacing:0.5px; }
+  .card-hero .big{ font-size:34px; font-weight:800; color:var(--navy); }
+  .card-hero .sub{ font-size:12px; color:var(--gray); }
+  .card-hero .ring{ width:128px; height:128px; margin-top:4px; }
+  .card-hero .ring-inner{ inset:11px; }
+  .card-hero .ring-inner .pct{ font-size:20px; }
+  .card-hero .ring-caption{ font-size:11px; }
+  .card-hero .card-lag{ font-size:13px; padding:5px 14px; }
+  .card-hero .card-delta{ font-size:12px; }
+  @media (max-width: 720px){
+    .hero-grid{ grid-template-columns: 1fr; }
+    .hero-projects{ grid-template-columns: repeat(2, 1fr); }
+  }
   .row-2{ grid-template-columns: repeat(auto-fit, minmax(340px,1fr)); }
   .metric{ text-align:center; display:flex; flex-direction:column; align-items:center; gap:6px; }
   .metric .label{ font-size:11.5px; font-weight:800; color:var(--navy-soft); }
@@ -195,7 +211,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <div class="period-caption" id="period-caption"></div>
 
   <!-- ПРИХОД: план/факт/отставание/сравнение с прошлым периодом -->
-  <div class="row" id="cards-row"></div>
+  <div class="hero-grid">
+    <div id="total-card-wrap"></div>
+    <div class="hero-projects" id="cards-row"></div>
+  </div>
 
   <!-- ПРОГНОЗ НА КОНЕЦ МЕСЯЦА (не зависит от фильтра) -->
   <div class="section-title">ПРОГНОЗ НА КОНЕЦ МЕСЯЦА</div>
@@ -248,18 +267,20 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     </div>
   </div>
 
-  <!-- ОТКАЗЫ ПО ПРИЧИНАМ -->
-  <div class="section-title">ОТКАЗЫ ЛИДОВ ПО ПРИЧИНАМ</div>
+  <!-- НЕКАЧЕСТВЕННЫЙ ТРАФИК -->
+  <div class="section-title">НЕКАЧЕСТВЕННЫЙ ТРАФИК</div>
+  <div class="section-hint">Лиды, ушедшие в отказ день в день</div>
+  <div class="row" id="reject-total-row" style="margin-bottom:16px;"></div>
   <div class="row row-2">
     <div class="card">
-      <div class="card-title">ПРИЧИНЫ ОТКАЗОВ ЗА ПЕРИОД</div>
+      <div class="card-title">РАЗБИВКА ПО ПРИЧИНАМ</div>
       <table>
         <tr><th>Причина</th><th class="num">Кол-во</th><th class="num">% от заявок</th></tr>
         <tbody id="rejects-table-body"></tbody>
       </table>
     </div>
     <div class="card">
-      <div class="card-title">ДОЛЯ ОТКАЗОВ ОТ ЗАЯВОК</div>
+      <div class="card-title">ДОЛЯ ОТ ЗАЯВОК</div>
       <div id="rejects-bars"></div>
     </div>
   </div>
@@ -329,7 +350,7 @@ function eachDate(start, end){
 
 function emptyAgg(){
   return {leads_target:0, leads_organic:0, budget_spent:0,
-    reject_offhours:0, reject_no_number:0, reject_no_answer:0, reject_nontarget:0,
+    reject_nontarget:0, reject_accidental:0, reject_no_number:0,
     pu_records:0, pu_attended:0,
     sales_target:0, sales_organic:0, revenue_target:0, revenue_organic:0, doplaty:0};
 }
@@ -340,8 +361,8 @@ function aggregate(rows, projects){
     if (!agg[r.project]) agg[r.project]=emptyAgg();
     const a = agg[r.project];
     a.leads_target+=r.leads_target; a.leads_organic+=r.leads_organic; a.budget_spent+=r.budget_spent;
-    a.reject_offhours+=r.reject_offhours; a.reject_no_number+=r.reject_no_number;
-    a.reject_no_answer+=r.reject_no_answer; a.reject_nontarget+=r.reject_nontarget;
+    a.reject_nontarget+=r.reject_nontarget; a.reject_accidental+=r.reject_accidental;
+    a.reject_no_number+=r.reject_no_number;
     a.pu_records+=r.pu_records; a.pu_attended+=r.pu_attended;
     a.sales_target+=r.sales_target; a.sales_organic+=r.sales_organic;
     a.revenue_target+=r.revenue_target; a.revenue_organic+=r.revenue_organic; a.doplaty+=r.doplaty;
@@ -351,7 +372,7 @@ function aggregate(rows, projects){
 function aggRevenue(a){ return a.revenue_target + a.revenue_organic + a.doplaty; }
 function aggSales(a){ return a.sales_target + a.sales_organic; }
 function aggLeads(a){ return a.leads_target + a.leads_organic; }
-function aggRejects(a){ return a.reject_offhours+a.reject_no_number+a.reject_no_answer+a.reject_nontarget; }
+function aggRejects(a){ return a.reject_nontarget+a.reject_accidental+a.reject_no_number; }
 
 function planSum(dateList, projects, metric){
   const plan = {}; projects.forEach(p=>plan[p]=0);
@@ -389,8 +410,8 @@ function renderRange(start, end, label){
     return `<div class="card-delta ${up?'up':'down'}">${up?'▲':'▼'} ${Math.abs(deltaPct).toFixed(1)}% к пред. периоду</div>`;
   }
 
-  let cardsHtml = `
-    <div class="card metric ${totalPct<ALERT_THRESHOLD?'alert':''}">
+  let totalCardHtml = `
+    <div class="card metric card-hero ${totalPct<ALERT_THRESHOLD?'alert':''}">
       <div class="label">ОБЩИЙ ПРИХОД</div>
       <div class="big">${fmtTg(totalFact)}</div>
       <div class="sub">План периода: ${fmtTg(totalPlan)}</div>
@@ -401,6 +422,9 @@ function renderRange(start, end, label){
       <div class="card-lag ${(totalFact-totalPlan)<0?'behind':'ahead'}">${(totalFact-totalPlan)<0?'−':'+'}${fmtTg(Math.abs(totalFact-totalPlan))} ${(totalFact-totalPlan)<0?'от плана':'к плану'}</div>
       ${deltaBadge(totalDeltaPct)}
     </div>`;
+  document.getElementById('total-card-wrap').innerHTML = totalCardHtml;
+
+  let cardsHtml = '';
   DATA.projects.forEach((p, idx) => {
     const pl = planRevenue[p], fa = aggRevenue(agg[p]);
     const pct = pl ? (fa/pl*100) : 0;
@@ -542,20 +566,28 @@ function renderCheckChart(dateList, filtered){
   document.getElementById('check-chart-wrap').innerHTML = lineChart(dateList, values, 'var(--teal)', '');
 }
 
-// ---- Отказы по причинам ----
+// ---- Некачественный трафик ----
 function renderRejects(agg){
-  let offhours=0, noNumber=0, noAnswer=0, nontarget=0, leads=0;
+  let nontarget=0, accidental=0, noNumber=0, leads=0;
   DATA.projects.forEach(p => {
     const a = agg[p];
-    offhours+=a.reject_offhours; noNumber+=a.reject_no_number;
-    noAnswer+=a.reject_no_answer; nontarget+=a.reject_nontarget;
+    nontarget+=a.reject_nontarget; accidental+=a.reject_accidental; noNumber+=a.reject_no_number;
     leads += aggLeads(a);
   });
+  const totalRejects = nontarget+accidental+noNumber;
+  const totalPct = leads ? (totalRejects/leads*100) : 0;
+
+  document.getElementById('reject-total-row').innerHTML = `
+    <div class="card metric ${totalPct>40?'alert':''}">
+      <div class="label">НЕКАЧЕСТВЕННЫЙ ТРАФИК ЗА ПЕРИОД</div>
+      <div class="big">${fmtInt(totalRejects)}</div>
+      <div class="sub">${totalPct.toFixed(1)}% от ${fmtInt(leads)} заявок</div>
+    </div>`;
+
   const items = [
-    ['Вне рабочее время', offhours],
-    ['Недозвоны', noAnswer],
-    ['Лид без номера', noNumber],
-    ['Непрофильный отказ', nontarget],
+    ['Непрофильный лид', nontarget],
+    ['Не оставлял заявку', accidental],
+    ['Нет номера телефона', noNumber],
   ];
   let rows = '';
   let barsHtml = '<div class="bars" style="display:flex;flex-direction:column;gap:12px;">';
@@ -565,8 +597,7 @@ function renderRejects(agg){
     barsHtml += `<div><div style="display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:4px;color:var(--navy-soft);font-weight:700;"><span>${name}</span><span>${pct.toFixed(1)}%</span></div>
       <div style="height:12px;background:var(--blue-track);border-radius:7px;overflow:hidden;"><div style="height:100%;width:${Math.min(pct,100).toFixed(1)}%;background:var(--red);border-radius:7px;"></div></div></div>`;
   });
-  const totalRejects = offhours+noNumber+noAnswer+nontarget;
-  rows += `<tr style="font-weight:800;background:#f7fafd;"><td>Итого отказов</td><td class="num">${fmtInt(totalRejects)}</td><td class="num">${leads?(totalRejects/leads*100).toFixed(1):0}%</td></tr>`;
+  rows += `<tr style="font-weight:800;background:#f7fafd;"><td>Итого</td><td class="num">${fmtInt(totalRejects)}</td><td class="num">${totalPct.toFixed(1)}%</td></tr>`;
   barsHtml += '</div>';
   document.getElementById('rejects-table-body').innerHTML = rows;
   document.getElementById('rejects-bars').innerHTML = barsHtml;
@@ -708,6 +739,16 @@ function renderForecast(){
 }
 
 // =================== ГРАФИК ПРИХОДА ПО ДНЯМ ===================
+function fmtAxisTg(v){
+  if (v >= 1000000){
+    const m = v/1000000;
+    const mStr = Number.isInteger(m) ? String(m) : m.toFixed(1).replace('.', ',');
+    return mStr + ' млн';
+  }
+  if (v === 0) return '0';
+  return Math.round(v/1000) + ' тыс.';
+}
+
 function renderChart(dateList, filtered){
   const byDateProject = {};
   dateList.forEach(d => { byDateProject[toISO(d)] = {}; });
@@ -717,7 +758,7 @@ function renderChart(dateList, filtered){
   });
   const n = dateList.length;
   const w = Math.max(600, n*46), h = 220;
-  const padL=60,padR=10,padT=10,padB=34;
+  const padL=64,padR=10,padT=10,padB=34;
   const plotW=w-padL-padR, plotH=h-padT-padB;
   let maxDayTotal=0;
   dateList.forEach(d => {
@@ -725,16 +766,20 @@ function renderChart(dateList, filtered){
     const dayTotal = DATA.projects.reduce((s,p)=> s+(byDateProject[iso][p]||0),0);
     if (dayTotal>maxDayTotal) maxDayTotal=dayTotal;
   });
-  if (maxDayTotal===0) maxDayTotal=1;
-  const niceMax = maxDayTotal*1.15;
+  // Фиксированная сетка шагом 500 тыс., минимум до 5 млн, дальше расширяется тем же шагом
+  const GRID_STEP = 500000;
+  const MIN_TOP = 5000000;
+  const topValue = Math.max(MIN_TOP, Math.ceil((maxDayTotal*1.05) / GRID_STEP) * GRID_STEP);
+  const gridCount = topValue / GRID_STEP;
+
   const barW = Math.min(34, plotW/n*0.6);
   const step = plotW/n;
   let svg = `<svg viewBox="0 0 ${w} ${h}" style="width:100%; height:auto; display:block;">`;
-  for (let i=0;i<=4;i++){
-    const y = padT+plotH-(plotH*i/4);
-    const val = niceMax*i/4;
+  for (let i=0;i<=gridCount;i++){
+    const val = i*GRID_STEP;
+    const y = padT+plotH-(plotH*val/topValue);
     svg += `<line x1="${padL}" y1="${y}" x2="${w-padR}" y2="${y}" stroke="#e3edf7" stroke-width="1"/>`;
-    svg += `<text x="${padL-8}" y="${y+4}" text-anchor="end" font-size="10" fill="#6b7a90">${Math.round(val/1000)}k</text>`;
+    svg += `<text x="${padL-8}" y="${y+4}" text-anchor="end" font-size="10" fill="#6b7a90">${fmtAxisTg(val)}</text>`;
   }
   dateList.forEach((d,i) => {
     const iso=toISO(d);
@@ -743,7 +788,7 @@ function renderChart(dateList, filtered){
     DATA.projects.forEach((p,pi) => {
       const val = byDateProject[iso][p]||0;
       if (val<=0) return;
-      const barH = (val/niceMax)*plotH;
+      const barH = (val/topValue)*plotH;
       yCursor -= barH;
       svg += `<rect x="${x.toFixed(1)}" y="${yCursor.toFixed(1)}" width="${barW.toFixed(1)}" height="${barH.toFixed(1)}" fill="${colorFor(pi)}" rx="2"/>`;
     });

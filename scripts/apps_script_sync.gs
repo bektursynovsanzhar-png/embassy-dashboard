@@ -9,7 +9,7 @@
  * 1) Google Форма с полями, порядок важен:
  *    Дата, Проект, Канал,
  *    Лиды с таргета, Лиды органика, Бюджет потрачено (тг),
- *    Отказ: вне рабочее время, Отказ: без номера, Отказ: недозвон, Отказ: непрофильный,
+ *    Некачественный: непрофильный лид, Некачественный: не оставлял заявку, Некачественный: нет номера,
  *    Записей на ПУ, Дошли на ПУ,
  *    Продаж с таргета (шт), Продаж с органики (шт),
  *    Приход с таргета (тг), Приход с органики (тг), Доплаты (тг)
@@ -60,12 +60,12 @@ function syncToGitHub() {
   // Колонки листа после Timestamp формы (индексы):
   // [1]=Дата [2]=Проект [3]=Канал
   // [4]=Лиды таргет [5]=Лиды органика [6]=Бюджет
-  // [7]=Откaз вне часов [8]=Отказ без номера [9]=Отказ недозвон [10]=Отказ непрофильный
-  // [11]=Записей ПУ [12]=Дошли ПУ
-  // [13]=Продаж таргет [14]=Продаж органика
-  // [15]=Приход таргет [16]=Приход органика [17]=Доплаты
+  // [7]=Непрофильный лид [8]=Не оставлял заявку [9]=Нет номера
+  // [10]=Записей ПУ [11]=Дошли ПУ
+  // [12]=Продаж таргет [13]=Продаж органика
+  // [14]=Приход таргет [15]=Приход органика [16]=Доплаты
   const header = 'date,project,channel,leads_target,leads_organic,budget_spent,' +
-    'reject_offhours,reject_no_number,reject_no_answer,reject_nontarget,' +
+    'reject_nontarget,reject_accidental,reject_no_number,' +
     'pu_records,pu_attended,sales_target,sales_organic,revenue_target,revenue_organic,doplaty';
   const csvLines = [header];
 
@@ -73,8 +73,8 @@ function syncToGitHub() {
     const r = rows[i];
     if (!r[1]) continue;
     const date = Utilities.formatDate(new Date(r[1]), 'GMT+6', 'yyyy-MM-dd');
-    const line = [date, r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9], r[10],
-      r[11], r[12], r[13], r[14], r[15], r[16], r[17]].join(',');
+    const line = [date, r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9],
+      r[10], r[11], r[12], r[13], r[14], r[15], r[16]].join(',');
     csvLines.push(line);
   }
   commitFileToGithub('data/daily.csv', csvLines.join('\n'), `Обновление данных: ${new Date().toISOString()}`);
