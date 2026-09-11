@@ -311,6 +311,18 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   </div>
 
   <!-- ПРОДАЖИ ПО ИСТОЧНИКАМ -->
+  <!-- КОЛИЧЕСТВО ПРОДАЖ С ПУ (привязка продажи к дню посещения ПУ) -->
+  <div class="section-title">КОЛИЧЕСТВО ПРОДАЖ С ПУ</div>
+  <div class="section-hint">Каждая продажа привязывается к самому раннему ещё не купившему посетителю ПУ (по датам в истории данных)</div>
+  <div class="row row-4" id="pu-sales-summary" style="margin-bottom:16px;"></div>
+  <div class="card" style="margin-bottom:16px;">
+    <table>
+      <tr><th>Проект</th><th>Дата ПУ</th><th class="num">Дошли</th><th class="num">Купили (из этого дня)</th><th class="num">Конверсия</th></tr>
+      <tbody id="pu-sales-table-body"></tbody>
+    </table>
+    <p class="note" id="pu-sales-note"></p>
+  </div>
+
   <div class="section-title">ПРОДАЖИ ПО ИСТОЧНИКАМ: ТАРГЕТ vs ОРГАНИКА</div>
   <div class="card" style="margin-bottom:16px;">
     <table>
@@ -488,6 +500,7 @@ function renderRange(start, end, label){
   renderSalesTable(agg, planRevenue, dateList);
   renderSmm(startISO, endISO);
   renderPuPeriod(startISO, endISO, label);
+  renderPuSalesBlock(startISO, endISO);
 }
 
 // ---- Воронка ----
@@ -928,6 +941,111 @@ function renderPuPeriod(startISO, endISO, label){
   );
   document.getElementById('pu-period-total').innerHTML = blocks.total;
   document.getElementById('pu-period-row').innerHTML = blocks.cards;
+}
+
+// =================== КОЛИЧЕСТВО ПРОДАЖ С ПУ (FIFO-привязка) ===================
+// Считается ОДИН раз по всей истории data/daily.csv + data/pu_live.csv,
+// не зависит от фильтра периода (иначе продажа за пределами периода не смогла
+// бы "закрыть" посетителя ПУ из этого периода). Фильтр периода влияет только
+// на то, какие строки (даты ПУ) показывать в таблице.
+let PU_SALES_ATTRIBUTION = null; // {project: {byDate: {date: converted}, pending, unattributed}}
+
+function computePuSalesAttribution(){
+  const result = {};
+  // все даты, где есть хоть pu_live, хоть daily — объединяем и сортируем
+  const allDatesSet = new Set();
+  (DATA.puLive||[]).forEach(r => allDatesSet.add(r.date));
+  (DATA.daily||[]).forEach(r => allDatesSet.add(r.date));
+  const allDates = Array.from(allDatesSet).sort();
+
+  DATA.projects.forEach(project => {
+    const attendedByDate = {};
+    (DATA.puLive||[]).forEach(r => { if (r.project===project) attendedByDate[r.date] = (attendedByDate[r.date]||0) + r.pu_attended; });
+    const salesByDate = {};
+    (DATA.daily||[]).forEach(r => { if (r.project===project) salesByDate[r.date] = (salesByDate[r.date]||0) + r.sales_target + r.sales_organic; });
+
+    const queue = []; // [date, remaining]
+    const byDate = {}; // date -> converted count
+    let unattributed = 0;
+
+    allDates.forEach(date => {
+      const att = attendedByDate[date] || 0;
+      if (att > 0){ queue.push([date, att]); }
+      let remain = salesByDate[date] || 0;
+      while (remain > 0 && queue.length){
+        const item = queue[0];
+        const take = Math.min(item[1], remain);
+        byDate[item[0]] = (byDate[item[0]]||0) + take;
+        item[1] -= take;
+        remain -= take;
+        if (item[1] === 0) queue.shift();
+      }
+      if (remain > 0) unattributed += remain;
+    });
+
+    const pending = queue.reduce((s,q)=>s+q[1],0);
+    result[project] = { attendedByDate, byDate, pending, unattributed };
+  });
+  return result;
+}
+
+function renderPuSalesBlock(startISO, endISO){
+  if (!PU_SALES_ATTRIBUTION) PU_SALES_ATTRIBUTION = computePuSalesAttribution();
+
+  let totalAttended=0, totalConverted=0, totalPending=0, totalUnattributed=0;
+  const perProject = {};
+  DATA.projects.forEach(p => {
+    const a = PU_SALES_ATTRIBUTION[p];
+    let att=0, conv=0;
+    Object.keys(a.attendedByDate).forEach(date => {
+      if (date>=startISO && date<=endISO){
+        att += a.attendedByDate[date];
+        conv += (a.byDate[date]||0);
+      }
+    });
+    perProject[p] = {att, conv};
+    totalAttended += att; totalConverted += conv;
+    totalPending += a.pending; totalUnattributed += a.unattributed;
+  });
+
+  let summaryHtml = `
+    <div class="card metric">
+      <div class="label">ДОШЛИ В ПЕРИОДЕ</div>
+      <div class="big">${fmtInt(totalAttended)}</div>
+      <div class="sub">за выбранный период</div>
+    </div>
+    <div class="card metric">
+      <div class="label">КУПИЛИ (ИЗ НИХ)</div>
+      <div class="big">${fmtInt(totalConverted)}</div>
+      <div class="sub">${totalAttended ? (totalConverted/totalAttended*100).toFixed(1) : 0}% конверсия</div>
+    </div>
+    <div class="card metric">
+      <div class="label">ЕЩЁ В ПРОЦЕССЕ</div>
+      <div class="big">${fmtInt(totalPending)}</div>
+      <div class="sub">дошли, но пока не купили (по всей истории)</div>
+    </div>
+    <div class="card metric">
+      <div class="label">БЕЗ ИСТОЧНИКА В ДАННЫХ</div>
+      <div class="big">${fmtInt(totalUnattributed)}</div>
+      <div class="sub">продажи от лидов до начала учёта</div>
+    </div>`;
+  document.getElementById('pu-sales-summary').innerHTML = summaryHtml;
+
+  let rows = '';
+  DATA.projects.forEach(p => {
+    const a = PU_SALES_ATTRIBUTION[p];
+    Object.keys(a.attendedByDate).sort().forEach(date => {
+      if (date<startISO || date>endISO) return;
+      const att = a.attendedByDate[date];
+      if (att === 0) return;
+      const conv = a.byDate[date] || 0;
+      const pct = att ? (conv/att*100) : 0;
+      rows += `<tr><td>${p}</td><td>${date}</td><td class="num">${fmtInt(att)}</td><td class="num">${fmtInt(conv)}</td><td class="num ${pct>=50?'pos':''}">${pct.toFixed(0)}%</td></tr>`;
+    });
+  });
+  document.getElementById('pu-sales-table-body').innerHTML = rows || '<tr><td colspan="5" style="text-align:center; color:var(--gray);">Нет записей ПУ в этом периоде</td></tr>';
+  document.getElementById('pu-sales-note').textContent =
+    'Конверсия считается по всей истории данных (продажа могла случиться позже выбранного периода) — итоговая цифра по недавним датам может ещё вырасти.';
 }
 
 renderPuToday();
