@@ -36,6 +36,7 @@ def build():
     plan_rows = read_csv(DATA_PLANS)
     smm_rows = read_csv(DATA_SMM)
     pu_live_rows = read_csv(ROOT / "data" / "pu_live.csv")
+    pu_conv_rows = read_csv(ROOT / "data" / "pu_conversions.csv")
     if not daily_rows:
         raise SystemExit("Нет данных в daily.csv")
 
@@ -93,12 +94,20 @@ def build():
         "pu_attended": num(row.get("pu_attended")),
     } for row in pu_live_rows]
 
+    pu_conversions = [{
+        "date": row["date"],
+        "project": row["project"],
+        "converted_count": num(row.get("converted_count")),
+        "converted_amount": num(row.get("converted_amount")),
+    } for row in pu_conv_rows]
+
     now = datetime.datetime.now()
     payload = {
         "daily": daily,
         "plans": plans,
         "smm": smm,
         "puLive": pu_live,
+        "puConversions": pu_conversions,
         "projects": projects_order,
         "generatedAt": now.strftime("%d.%m.%Y %H:%M"),
     }
@@ -952,11 +961,18 @@ let PU_SALES_ATTRIBUTION = null; // {project: {byDate: {date: converted}, pendin
 
 function computePuSalesAttribution(){
   const result = {};
-  // все даты, где есть хоть pu_live, хоть daily — объединяем и сортируем
   const allDatesSet = new Set();
   (DATA.puLive||[]).forEach(r => allDatesSet.add(r.date));
   (DATA.daily||[]).forEach(r => allDatesSet.add(r.date));
   const allDates = Array.from(allDatesSet).sort();
+
+  // Точные известные конверсии (дата ПУ -> купили), из pu_conversions.csv —
+  // это реальные записи "пришёл в этот день + купил", без прогноза.
+  const exactByProject = {};
+  (DATA.puConversions||[]).forEach(r => {
+    exactByProject[r.project] = exactByProject[r.project] || {};
+    exactByProject[r.project][r.date] = { count: r.converted_count, amount: r.converted_amount };
+  });
 
   DATA.projects.forEach(project => {
     const attendedByDate = {};
@@ -964,27 +980,42 @@ function computePuSalesAttribution(){
     const salesByDate = {};
     (DATA.daily||[]).forEach(r => { if (r.project===project) salesByDate[r.date] = (salesByDate[r.date]||0) + r.sales_target + r.sales_organic; });
 
-    const queue = []; // [date, remaining]
-    const byDate = {}; // date -> converted count
+    const exact = exactByProject[project] || {};
+    let knownConvertedTotal = 0;
+    Object.values(exact).forEach(v => { knownConvertedTotal += v.count; });
+    const totalSalesAll = Object.values(salesByDate).reduce((s,v)=>s+v,0);
+    let remainingForFifo = Math.max(0, totalSalesAll - knownConvertedTotal);
+
+    const queue = []; // только даты БЕЗ точных данных
+    const byDate = {};
     let unattributed = 0;
 
     allDates.forEach(date => {
+      if (exact.hasOwnProperty(date)){
+        byDate[date] = exact[date].count; // точное значение — не через FIFO
+        return;
+      }
       const att = attendedByDate[date] || 0;
       if (att > 0){ queue.push([date, att]); }
-      let remain = salesByDate[date] || 0;
-      while (remain > 0 && queue.length){
-        const item = queue[0];
-        const take = Math.min(item[1], remain);
-        byDate[item[0]] = (byDate[item[0]]||0) + take;
-        item[1] -= take;
-        remain -= take;
-        if (item[1] === 0) queue.shift();
-      }
-      if (remain > 0) unattributed += remain;
     });
 
-    const pending = queue.reduce((s,q)=>s+q[1],0);
-    result[project] = { attendedByDate, byDate, pending, unattributed };
+    let remain = remainingForFifo;
+    for (let i=0; i<queue.length && remain>0; i++){
+      const item = queue[i];
+      const take = Math.min(item[1], remain);
+      byDate[item[0]] = (byDate[item[0]]||0) + take;
+      remain -= take;
+    }
+    if (remain > 0) unattributed += remain;
+
+    let pending = 0;
+    allDates.forEach(date => {
+      const att = attendedByDate[date] || 0;
+      const conv = byDate[date] || 0;
+      pending += Math.max(0, att - conv);
+    });
+
+    result[project] = { attendedByDate, byDate, pending, unattributed, exactDates: Object.keys(exact) };
   });
   return result;
 }
@@ -1040,7 +1071,11 @@ function renderPuSalesBlock(startISO, endISO){
       if (att === 0) return;
       const conv = a.byDate[date] || 0;
       const pct = att ? (conv/att*100) : 0;
-      rows += `<tr><td>${p}</td><td>${date}</td><td class="num">${fmtInt(att)}</td><td class="num">${fmtInt(conv)}</td><td class="num ${pct>=50?'pos':''}">${pct.toFixed(0)}%</td></tr>`;
+      const isExact = a.exactDates && a.exactDates.includes(date);
+      const badge = isExact
+        ? '<span style="font-size:9.5px; color:var(--green-dark); background:var(--green-track); padding:1px 6px; border-radius:6px; margin-left:6px;">точно</span>'
+        : '<span style="font-size:9.5px; color:var(--gray); background:#f2f7fc; padding:1px 6px; border-radius:6px; margin-left:6px;">оценка</span>';
+      rows += `<tr><td>${p}</td><td>${date}</td><td class="num">${fmtInt(att)}</td><td class="num">${fmtInt(conv)}${badge}</td><td class="num ${pct>=50?'pos':''}">${pct.toFixed(0)}%</td></tr>`;
     });
   });
   document.getElementById('pu-sales-table-body').innerHTML = rows || '<tr><td colspan="5" style="text-align:center; color:var(--gray);">Нет записей ПУ в этом периоде</td></tr>';
