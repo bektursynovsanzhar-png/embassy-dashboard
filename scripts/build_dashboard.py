@@ -35,6 +35,7 @@ def build():
     daily_rows = read_csv(DATA_DAILY)
     plan_rows = read_csv(DATA_PLANS)
     smm_rows = read_csv(DATA_SMM)
+    pu_live_rows = read_csv(ROOT / "data" / "pu_live.csv")
     if not daily_rows:
         raise SystemExit("Нет данных в daily.csv")
 
@@ -85,11 +86,19 @@ def build():
         "engagement": num(row.get("engagement")),
     } for row in smm_rows]
 
+    pu_live = [{
+        "date": row["date"],
+        "project": row["project"],
+        "pu_records": num(row.get("pu_records")),
+        "pu_attended": num(row.get("pu_attended")),
+    } for row in pu_live_rows]
+
     now = datetime.datetime.now()
     payload = {
         "daily": daily,
         "plans": plans,
         "smm": smm,
+        "puLive": pu_live,
         "projects": projects_order,
         "generatedAt": now.strftime("%d.%m.%Y %H:%M"),
     }
@@ -227,6 +236,20 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     <div class="card-title">ДИНАМИКА ПРИХОДА ПО ДНЯМ</div>
     <div id="chart-wrap"></div>
     <div class="chart-legend" id="chart-legend"></div>
+  </div>
+
+  <!-- ЗАПИСИ НА ПУ: СЕГОДНЯ / ВЧЕРА (живые данные из таблицы записи) -->
+  <div class="section-title">ЗАПИСИ НА ПУ — СЕГОДНЯ</div>
+  <div class="hero-grid">
+    <div id="pu-today-total"></div>
+    <div class="hero-projects" id="pu-today-row"></div>
+  </div>
+
+  <div class="section-title">ЗАПИСИ НА ПУ ЗА ПЕРИОД (ЖИВЫЕ ДАННЫЕ)</div>
+  <div class="section-hint">Меняется вместе с фильтром периода наверху страницы</div>
+  <div class="hero-grid">
+    <div id="pu-period-total"></div>
+    <div class="hero-projects" id="pu-period-row"></div>
   </div>
 
   <!-- ВОРОНКА -->
@@ -464,6 +487,7 @@ function renderRange(start, end, label){
   renderPuTable(agg, dateList);
   renderSalesTable(agg, planRevenue, dateList);
   renderSmm(startISO, endISO);
+  renderPuPeriod(startISO, endISO, label);
 }
 
 // ---- Воронка ----
@@ -838,6 +862,75 @@ document.getElementById('apply-custom').addEventListener('click', () => {
   renderRange(new Date(from), new Date(to), 'Свой период');
 });
 
+// =================== ЗАПИСИ НА ПУ: СЕГОДНЯ / ВЧЕРА (живые данные) ===================
+function heroBlockHtml(title, sub, byProject, alertBelow){
+  let totalVal = 0, totalOf = 0;
+  DATA.projects.forEach(p => { totalVal += (byProject[p] ? byProject[p].main : 0); totalOf += (byProject[p] ? byProject[p].of : 0); });
+  const totalPct = totalOf ? (totalVal/totalOf*100) : null;
+  const heroAlert = (alertBelow!=null && totalOf>0 && totalVal/totalOf*100 < alertBelow) ? 'alert' : '';
+  let html = `<div class="card metric card-hero ${heroAlert}">
+    <div class="label">${title}</div>
+    <div class="big">${fmtInt(totalVal)}</div>
+    <div class="sub">${sub(totalVal, totalOf, totalPct)}</div>
+  </div>`;
+  let cardsHtml = '';
+  DATA.projects.forEach((p, idx) => {
+    const d = byProject[p] || {main:0, of:0};
+    const pct = d.of ? (d.main/d.of*100) : null;
+    const alert = (alertBelow!=null && d.of>0 && pct < alertBelow) ? 'alert' : '';
+    cardsHtml += `<div class="card metric ${alert}">
+      <div class="label">${p.toUpperCase()}</div>
+      <div class="big">${fmtInt(d.main)}</div>
+      <div class="sub">${sub(d.main, d.of, pct)}</div>
+    </div>`;
+  });
+  return {total: html, cards: cardsHtml};
+}
+
+function renderPuToday(){
+  const puLive = DATA.puLive || [];
+  const today = new Date(); today.setHours(0,0,0,0);
+  const todayISO = toISO(today);
+  const todayDisp = today.getDate()+'.'+String(today.getMonth()+1).padStart(2,'0');
+
+  const byProjectToday = {};
+  DATA.projects.forEach(p => { byProjectToday[p] = {main:0, of:0}; });
+  puLive.forEach(r => {
+    if (r.date === todayISO){
+      if (!byProjectToday[r.project]) byProjectToday[r.project] = {main:0,of:0};
+      byProjectToday[r.project].main = r.pu_records; byProjectToday[r.project].of = 0;
+    }
+  });
+
+  const todayBlocks = heroBlockHtml('ЗАПИСЕЙ НА СЕГОДНЯ', ()=>`Записей на ${todayDisp}`, byProjectToday, null);
+  document.getElementById('pu-today-total').innerHTML = todayBlocks.total;
+  document.getElementById('pu-today-row').innerHTML = todayBlocks.cards;
+}
+
+// Вызывается из renderRange() при каждой смене фильтра периода —
+// суммирует записи/дошли из pu_live.csv за выбранный диапазон дат.
+function renderPuPeriod(startISO, endISO, label){
+  const puLive = DATA.puLive || [];
+  const filtered = puLive.filter(r => r.date >= startISO && r.date <= endISO);
+
+  const byProject = {};
+  DATA.projects.forEach(p => { byProject[p] = {main:0, of:0}; });
+  filtered.forEach(r => {
+    if (!byProject[r.project]) byProject[r.project] = {main:0, of:0};
+    byProject[r.project].main += r.pu_attended;
+    byProject[r.project].of += r.pu_records;
+  });
+
+  const blocks = heroBlockHtml(
+    'ДОШЛИ ЗА ПЕРИОД',
+    (v,of,pct)=> of ? `${fmtInt(v)} из ${fmtInt(of)} записей (${pct.toFixed(0)}%)` : 'Записей не было',
+    byProject, 50
+  );
+  document.getElementById('pu-period-total').innerHTML = blocks.total;
+  document.getElementById('pu-period-row').innerHTML = blocks.cards;
+}
+
+renderPuToday();
 renderForecast();
 applyPreset('thismonth', document.querySelector('[data-preset="thismonth"]'));
 </script>
